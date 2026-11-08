@@ -19,8 +19,8 @@ import (
 // helperDocs is how to install the WebDriverAgent helper, and
 // helperAgainDocs how to install it again when its signature runs out.
 const (
-	helperDocs      = "https://github.com/DIYgod/pinky/blob/main/docs/notes/ios.md#installing-the-webdriveragent-helper"
-	helperAgainDocs = "https://github.com/DIYgod/pinky/blob/main/docs/notes/ios.md#when-the-helpers-signature-runs-out"
+	helperDocs      = "https://github.com/yaoqiangyao/pinky/blob/main/docs/notes/ios.md#installing-the-webdriveragent-helper"
+	helperAgainDocs = "https://github.com/yaoqiangyao/pinky/blob/main/docs/notes/ios.md#when-the-helpers-signature-runs-out"
 )
 
 // helperLink is how to install an iPhone's helper: again, when Pinky knows

@@ -113,10 +113,10 @@ func TestParseFeed(t *testing.T) {
 
 func TestFeedURL(t *testing.T) {
 	t.Setenv(FeedEnv, "")
-	if got := FeedURL(); got != "https://github.com/DIYgod/pinky/releases/latest/download/latest.json" {
+	if got := FeedURL(); got != "https://github.com/yaoqiangyao/pinky/releases/latest/download/latest.json" {
 		t.Errorf("FeedURL = %s", got)
 	}
-	if got := ReleasePage("v2026.1107.2"); got != "https://github.com/DIYgod/pinky/releases/tag/v2026.1107.2" {
+	if got := ReleasePage("v2026.1107.2"); got != "https://github.com/yaoqiangyao/pinky/releases/tag/v2026.1107.2" {
 		t.Errorf("ReleasePage = %s", got)
 	}
 	t.Setenv(FeedEnv, "http://127.0.0.1:9/latest.json")

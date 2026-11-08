@@ -25,7 +25,7 @@ set -eu
 
 cd "$(dirname "$0")/.."
 root=$(pwd)
-repo=${RELEASES_REPO:-DIYgod/pinky}
+repo=${RELEASES_REPO:-yaoqiangyao/pinky}
 tap=${TAP_REPO:-DIYgod/homebrew-tap}
 export RELEASES_REPO=$repo TAP_REPO=$tap
 

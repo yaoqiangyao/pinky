@@ -5,6 +5,8 @@ What changed for people in each release of Pinky, newest first. A version is the
 ## Unreleased
 
 - Unlocking an iPhone from the computer now works when the phone doesn't say whether its screen is on, as some iPhones on iOS 27 do.
+- Pinky now comes from flyfox's fork, yaoqiangyao/pinky, for Windows and iPhones on iOS 27 or later. It updates from there, and Help › Send Feedback… opens an issue there.
+- Pinky no longer sends usage statistics or crash reports.
 
 ## 2026.1108.24 (2026-11-08)
 

@@ -1,8 +1,10 @@
 <p align="center"><img src="assets/icon/pinky-macos-1024.png" width="112" alt=""></p>
 <h1 align="center">Pinky</h1>
 <p align="center"><b>让任何 AI Agent 用上你的 iPhone 和 Android 手机：Mac、Windows、Linux 都能跑，关键一步你说了算。</b></p>
-<p align="center"><a href="https://github.com/DIYgod/pinky/releases/latest">下载</a> · <a href="#开始使用">开始使用</a> · <a href="#常见问题">常见问题</a> · <a href="https://discord.gg/S27b7SHjng">Discord</a></p>
+<p align="center"><a href="https://github.com/yaoqiangyao/pinky/releases/latest">下载</a> · <a href="#开始使用">开始使用</a> · <a href="#常见问题">常见问题</a> · <a href="https://discord.gg/S27b7SHjng">Discord</a></p>
 <p align="center"><a href="README.md">English</a> · 简体中文</p>
+
+> **这是 flyfox 维护的 [DIYgod/pinky](https://github.com/DIYgod/pinky) 分支，只面向 Windows 和 iOS 27 及以上的 iPhone。** 这里发布的版本只有 Windows 版，不带安卓配套应用，不发送使用统计和崩溃报告，从这个仓库检查更新；「帮助 › 发送反馈…」会在这里提 issue。下文介绍的是完整的 Pinky。
 <p align="center"><img src="assets/readme/demo-zh.gif" width="760" alt="Claude Code 在短信里输入回复，Pinky 扣住「发送」这一下，等你允许后才发出去"><br><sub>在 Android 16 模拟器上真实运行的 Claude Code。Pinky 默认只在付款前询问，这次还设了发消息前也要问。</sub></p>
 
 Pinky 让任何 Agent（Claude Code、Claude Desktop、Codex、Cursor，或者一段脚本）通过 MCP 操作真实的 iPhone 或 Android 手机。你在电脑上看着它干活，有风险的步骤由你批准，随时可以接管，事后还能回看。审批由 Pinky 的网关执行，不靠给 Agent 的指令。

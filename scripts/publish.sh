@@ -13,7 +13,7 @@
 # already keeps its files.
 #
 # Environment:
-#   RELEASES_REPO  the repository of the releases (DIYgod/pinky)
+#   RELEASES_REPO  the repository of the releases (yaoqiangyao/pinky)
 #   TAP_REPO       the Homebrew tap the release page names (DIYgod/homebrew-tap)
 #   GH_TOKEN       for gh, which must be able to write RELEASES_REPO
 #                  (default: gh's own login)
@@ -22,7 +22,7 @@ set -eu
 dir=${1:?usage: scripts/publish.sh <dir>}
 case $dir in /*) ;; *) dir=$(pwd)/$dir ;; esac
 cd "$(dirname "$0")/.."
-repo=${RELEASES_REPO:-DIYgod/pinky}
+repo=${RELEASES_REPO:-yaoqiangyao/pinky}
 tap=${TAP_REPO:-DIYgod/homebrew-tap}
 # brew's name of the tap: DIYgod/homebrew-tap is diygod/tap.
 tapname=$(printf '%s/%s' "${tap%%/*}" "${tap#*/homebrew-}" | tr '[:upper:]' '[:lower:]')
@@ -50,8 +50,7 @@ tag=v$version
 
 ---
 
-**macOS:** \`brew install --cask $tapname/pinky\`, or the \`.dmg\` for your Mac below (\`arm64\` for Apple silicon, \`amd64\` for Intel).
-**Windows:** \`pinky-setup-$version-amd64.exe\`. **Linux:** \`pinky_${version}_amd64.deb\`, or \`pinky-$version-linux-amd64.tar.gz\`.
+**Windows:** \`pinky-setup-$version-amd64.exe\`, or \`pinky-$version-windows-amd64.zip\` to run it without installing. For iPhones on iOS 27 or later.
 **Claude Desktop:** with Pinky installed, open \`pinky-$version.mcpb\` to add Pinky to Claude Desktop as an extension; Settings › Agents in Pinky connects Claude Code, Codex, Cursor and others with a click.
 EOF
 } >"$work/notes.md"

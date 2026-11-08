@@ -5,6 +5,8 @@ Pinky 每个版本给用户带来了哪些变化，最新的在最前面。版�
 ## Unreleased
 
 - 有些 iOS 27 的 iPhone 不报告屏幕是否亮着，现在从电脑也能解锁这类 iPhone。
+- Pinky 现在由 flyfox 维护的分支 yaoqiangyao/pinky 发布，只面向 Windows 和 iOS 27 及以上的 iPhone；更新从这个仓库获取，「发送反馈…」也会在这里提 issue。
+- Pinky 不再发送使用统计和崩溃报告。
 
 ## 2026.1108.24 (2026-11-08)
 

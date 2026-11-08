@@ -10,6 +10,8 @@ The README comes in English, [README.md](README.md), and in Simplified Chinese, 
 
 ## Releases
 
+This checkout is flyfox's fork: `origin` is `yaoqiangyao/pinky`, and `upstream` is `DIYgod/pinky`, whose changes are merged in by hand. Its releases are Windows only, for iPhones on iOS 27 or later: no companion APK, no macOS or Linux packages, no Homebrew cask, and no telemetry. Keep the fork's changes small so that upstream merges stay easy.
+
 Pinky releases often, several times a day when there is something to ship. Versions are the date in Asia/Shanghai and that day's count, `YYYY.MDD.N` (`2026.1107.2` is the second release of 7 November 2026), and are never written by hand. [docs/RELEASING.md](docs/RELEASING.md) explains the whole pipeline.
 
 Whoever pushes to `main` decides whether the push is a release:

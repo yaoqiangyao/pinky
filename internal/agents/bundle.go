@@ -52,7 +52,7 @@ done
 for p in /opt/homebrew/bin/pinkyctl /usr/local/bin/pinkyctl /usr/bin/pinkyctl "$HOME/.local/bin/pinkyctl"; do
 	[ -x "$p" ] && exec "$p" mcp
 done
-echo "Pinky is not installed. Get it from https://github.com/DIYgod/pinky/releases/latest" >&2
+echo "Pinky is not installed. Get it from https://github.com/yaoqiangyao/pinky/releases/latest" >&2
 exit 1
 `
 
@@ -65,13 +65,13 @@ func manifest(o BundleOptions) object {
 		{"version", o.Version},
 		{"description", "Let Claude use your iPhone or Android phone, with you watching and approving the risky steps."},
 		{"long_description", "Pinky lets Claude operate your real iPhone or Android phone, while you watch on your computer, approve risky steps such as payments, take over and review what happened. " +
-			"This extension starts the Pinky app installed on your computer (https://github.com/DIYgod/pinky/releases/latest); install Pinky first. " +
+			"This extension starts the Pinky app installed on your computer (https://github.com/yaoqiangyao/pinky/releases/latest); install Pinky first. " +
 			"The first time Claude connects, Pinky asks you to allow it."},
 		{"author", object{{"name", "DIYgod"}, {"url", "https://github.com/DIYgod"}}},
-		{"homepage", "https://github.com/DIYgod/pinky"},
-		{"documentation", "https://github.com/DIYgod/pinky/blob/main/docs/mcp.md"},
-		{"support", "https://github.com/DIYgod/pinky/issues"},
-		{"repository", object{{"type", "git"}, {"url", "https://github.com/DIYgod/pinky"}}},
+		{"homepage", "https://github.com/yaoqiangyao/pinky"},
+		{"documentation", "https://github.com/yaoqiangyao/pinky/blob/main/docs/mcp.md"},
+		{"support", "https://github.com/yaoqiangyao/pinky/issues"},
+		{"repository", object{{"type", "git"}, {"url", "https://github.com/yaoqiangyao/pinky"}}},
 		{"license", "Apache-2.0"},
 		{"icon", "icon.png"},
 		{"server", object{

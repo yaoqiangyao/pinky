@@ -2,16 +2,14 @@ name: Release
 run-name: Release ${{ inputs.tag || github.ref_name }}
 
 # A tag v<version>, which `scripts/release.sh tag` pushes with its commit,
-# is a release: this builds the companion APK, Pinky for Windows and Linux
-# (Ubuntu, with the FFmpeg and adb that scripts/ffmpeg.sh and
-# scripts/adb.sh build in containers) and Pinky.app for Apple silicon and
-# Intel (macOS: signed with the Developer ID, both disk images notarized at
-# once, the tickets stapled), checks that the Linux and Windows packages'
-# FFmpeg decodes and that every package's adb runs a server (on Ubuntu,
-# GitHub's Windows runner and macOS), then publishes the GitHub release,
-# latest.json last. The steps are the scripts at the tag: scripts/dist.sh
-# builds, scripts/publish.sh publishes. The Homebrew tap takes the cask
-# that the release carries. See docs/RELEASING.md.
+# is a release: this builds Pinky for Windows (on Ubuntu, with the FFmpeg
+# and adb that scripts/ffmpeg.sh and scripts/adb.sh build in containers),
+# checks on GitHub's Windows runner that the package's FFmpeg decodes and
+# its adb runs a server, then publishes the GitHub release, latest.json
+# last. This fork ships Windows only and for iPhones only: no companion
+# APK, no macOS or Linux packages, no Homebrew cask. The steps are the
+# scripts at the tag: scripts/dist.sh builds, scripts/publish.sh
+# publishes. See docs/RELEASING.md.
 on:
   push:
     tags: ["v*"]
@@ -39,65 +37,10 @@ env:
   REF: ${{ (github.event_name == 'workflow_dispatch' && !inputs.publish) && github.sha || format('refs/tags/{0}', inputs.tag || github.ref_name) }}
 
 jobs:
-  companion:
-    name: Companion APK
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ env.REF }}
-          persist-credentials: false
-          fetch-depth: 0 # the companion's versionCode is the count of commits
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "25"
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - name: Check the tag
-        run: go run ./scripts/release newer "${TAG#v}"
-      - name: Check its notes
-        # A run that publishes nothing may build a branch whose CHANGELOG.md
-        # does not have the tag's notes yet.
-        if: github.event_name == 'push' || inputs.publish
-        run: go run ./scripts/release notes "${TAG#v}" > /dev/null
-      - name: Build
-        # Signed with Pinky's release key, which only these secrets hold:
-        # Android installs an update of the app only when it is signed with
-        # the installed one's key (docs/RELEASING.md). The keystore is on
-        # the runner only while the build runs.
-        env:
-          STRICT: "1"
-          COMPANION_KEYSTORE: ${{ secrets.COMPANION_KEYSTORE }}
-          PINKY_COMPANION_KEYSTORE_PASSWORD: ${{ secrets.COMPANION_KEYSTORE_PASSWORD }}
-        run: |
-          if [ -z "$COMPANION_KEYSTORE" ] || [ -z "$PINKY_COMPANION_KEYSTORE_PASSWORD" ]; then
-            echo "::error::The secrets COMPANION_KEYSTORE (the companion's release keystore, base64) and COMPANION_KEYSTORE_PASSWORD are not set; see docs/RELEASING.md"
-            exit 1
-          fi
-          export PINKY_COMPANION_KEYSTORE="$RUNNER_TEMP/companion-release.p12"
-          trap 'rm -f "$PINKY_COMPANION_KEYSTORE"' EXIT
-          (umask 077 && printf '%s' "$COMPANION_KEYSTORE" | base64 --decode > "$PINKY_COMPANION_KEYSTORE")
-          go run ./scripts/release stamp "${TAG#v}"
-          scripts/dist.sh companion "$RUNNER_TEMP/companion"
-          # The certificate the release is signed with, for the log: the
-          # same in every release, or installed Companions cannot update.
-          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$bt/apksigner" verify --print-certs "$RUNNER_TEMP/companion/pinky-companion.apk" 2>/dev/null | grep -E 'DN|SHA-256' || true
-      - uses: actions/upload-artifact@v7
-        with:
-          name: companion
-          path: ${{ runner.temp }}/companion/pinky-companion.apk
-          if-no-files-found: error
-          retention-days: 3
-
   linux-windows:
-    name: Linux and Windows
-    needs: companion
+    name: Windows build
     runs-on: ubuntu-latest
-    # FFmpeg and adb for both, when the cache has none, take about 20.
+    # FFmpeg and adb, when the cache has none, take about 15.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -121,27 +64,13 @@ jobs:
         with:
           path: build/adb-dist
           key: adb-windows-linux-${{ hashFiles('scripts/adb.sh', 'scripts/adb/**') }}
-      - uses: actions/download-artifact@v8
-        with:
-          name: companion
-          path: ${{ runner.temp }}/companion
       - name: Build
         env:
           STRICT: "1"
-          COMPANION_APK: ${{ runner.temp }}/companion/pinky-companion.apk
+          PINKY_NO_COMPANION: "1"
         run: |
           go run ./scripts/release stamp "${TAG#v}"
           scripts/dist.sh windows "$RUNNER_TEMP/dist"
-          scripts/dist.sh linux "$RUNNER_TEMP/dist"
-      - name: Check that the Linux package's FFmpeg decodes
-        run: |
-          dir="$RUNNER_TEMP/linux-package"
-          mkdir -p "$dir"
-          tar -xzf "$RUNNER_TEMP/dist/pinky-${TAG#v}-linux-amd64.tar.gz" -C "$dir"
-          PINKY_FFMPEG_APP="$dir" go test -count=1 -run TestPackagedFFmpeg -v ./internal/video/ | grep -E -e '--- |^(ok|FAIL)|video_test.go'
-      - name: Check that the Linux package's adb runs a server
-        run: |
-          PINKY_ADB_APP="$RUNNER_TEMP/linux-package" go test -count=1 -run TestPackagedADB -v ./internal/driver/android/adb/ | grep -E -e '--- |^(ok|FAIL)|packaged_test.go'
       - uses: actions/upload-artifact@v7
         with:
           name: linux-windows
@@ -197,113 +126,9 @@ jobs:
         run: |
           PINKY_ADB_APP="$RUNNER_TEMP\windows-package" go test -count=1 -run TestPackagedADB -v ./internal/driver/android/adb/ | grep -E -e '--- |^(ok|FAIL)|packaged_test.go'
 
-  macos:
-    name: macOS
-    needs: companion
-    runs-on: macos-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ env.REF }}
-          persist-credentials: false
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - name: Cache FFmpeg
-        id: ffmpeg
-        uses: actions/cache@v6
-        with:
-          path: build/ffmpeg-dist
-          key: ffmpeg-macos-${{ hashFiles('scripts/ffmpeg.sh') }}
-      - name: Install nasm, for FFmpeg's Intel assembly
-        if: steps.ffmpeg.outputs.cache-hit != 'true'
-        run: brew install --quiet nasm
-      - name: Cache adb
-        id: adb
-        uses: actions/cache@v6
-        with:
-          path: build/adb-dist
-          key: adb-macos-${{ hashFiles('scripts/adb.sh', 'scripts/adb/**') }}
-      - name: Install CMake, for adb
-        if: steps.adb.outputs.cache-hit != 'true'
-        run: command -v cmake >/dev/null || brew install --quiet cmake
-      - name: Put the Developer ID and the notary's credentials in a keychain
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
-          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
-          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: |
-          if [ -z "$MACOS_CERTIFICATE" ]; then
-            echo "::error::The secret MACOS_CERTIFICATE (the Developer ID Application certificate as a base64 .p12) is not set; see docs/RELEASING.md, or publish from the Mac with scripts/release.sh publish $TAG"
-            exit 1
-          fi
-          keychain="$RUNNER_TEMP/pinky-signing.keychain-db"
-          password="$(openssl rand -base64 24)"
-          security create-keychain -p "$password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$password" "$keychain"
-          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
-          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign >/dev/null
-          rm -f "$RUNNER_TEMP/developer-id.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
-          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          security find-identity -v -p codesigning "$keychain"
-          if [ -n "$NOTARY_API_KEY" ]; then
-            printf '%s\n' "$NOTARY_API_KEY" > "$RUNNER_TEMP/notary-key.p8"
-            xcrun notarytool store-credentials pinky-notary --keychain "$keychain" \
-              --key "$RUNNER_TEMP/notary-key.p8" --key-id "$NOTARY_API_KEY_ID" --issuer "$NOTARY_API_ISSUER" >/dev/null
-          elif [ -n "$APPLE_ID" ]; then
-            xcrun notarytool store-credentials pinky-notary --keychain "$keychain" \
-              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" >/dev/null
-          else
-            echo "::error::Neither NOTARY_API_KEY (an App Store Connect API key) nor APPLE_ID is set, so nothing can notarize; see docs/RELEASING.md"
-            exit 1
-          fi
-          echo "NOTARY_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@v8
-        with:
-          name: companion
-          path: ${{ runner.temp }}/companion
-      - name: Build, sign and notarize
-        env:
-          STRICT: "1"
-          COMPANION_APK: ${{ runner.temp }}/companion/pinky-companion.apk
-          SIGN: ${{ vars.MACOS_SIGN_IDENTITY }}
-        run: |
-          go run ./scripts/release stamp "${TAG#v}"
-          scripts/dist.sh darwin "$RUNNER_TEMP/dist"
-      - name: Check that the apps' adb runs a server
-        run: |
-          for arch in arm64 amd64; do
-            if [ "$arch" = amd64 ] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then
-              echo "No Rosetta on this runner: the Intel app's adb was checked for its processor only"
-              continue
-            fi
-            dir="$RUNNER_TEMP/check-adb-$arch"
-            ditto -x -k "$RUNNER_TEMP/dist/pinky-${TAG#v}-darwin-$arch.zip" "$dir"
-            PINKY_ADB_APP="$dir/Pinky.app" go test -count=1 -run TestPackagedADB -v ./internal/driver/android/adb/ | grep -E -e '--- |^(ok|FAIL)|packaged_test.go'
-          done
-      - uses: actions/upload-artifact@v7
-        with:
-          name: macos
-          path: ${{ runner.temp }}/dist/
-          if-no-files-found: error
-          retention-days: 3
-      - name: Remove the keychain
-        if: always()
-        run: |
-          security delete-keychain "$RUNNER_TEMP/pinky-signing.keychain-db" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/notary-key.p8"
-
   publish:
     name: Publish
-    needs: [linux-windows, windows, macos]
+    needs: [linux-windows, windows]
     if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -321,16 +146,12 @@ jobs:
         with:
           name: linux-windows
           path: ${{ runner.temp }}/dist
-      - uses: actions/download-artifact@v8
-        with:
-          name: macos
-          path: ${{ runner.temp }}/dist
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASES_REPO: ${{ github.repository }}
         run: |
           go run ./scripts/release mcpb -version "${TAG#v}" -out "$RUNNER_TEMP/dist/pinky-${TAG#v}.mcpb"
-          go run ./scripts/release manifest -dir "$RUNNER_TEMP/dist" -version "${TAG#v}" -repo "$RELEASES_REPO"
+          go run ./scripts/release manifest -dir "$RUNNER_TEMP/dist" -version "${TAG#v}" -repo "$RELEASES_REPO" -partial
           ls -l "$RUNNER_TEMP/dist"
           scripts/publish.sh "$RUNNER_TEMP/dist"

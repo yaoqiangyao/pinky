@@ -1,5 +1,7 @@
 # Releasing Pinky
 
+> **In this fork** (`yaoqiangyao/pinky`) a release builds Windows only: the release workflow has no companion, macOS or Linux job, builds with `PINKY_NO_COMPANION=1`, writes `latest.json` with `-partial` and no cask, and needs no secrets. What follows describes upstream's full pipeline, `DIYgod/pinky`; the Windows parts apply here as written.
+
 Pinky releases often, several times a day when there is something to ship, and nobody builds a release by hand: the agent that pushes to `main` writes the notes and runs one command, and a workflow does the rest, in the open. The rule for when a push is a release is in [CLAUDE.md](../CLAUDE.md).
 
 ## How a release happens

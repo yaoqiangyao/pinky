@@ -1,7 +1,7 @@
 {
   "name": "Pinky",
   "slug": "pinky",
-  "identifier": "app.pinky.desktop",
+  "identifier": "com.flyfox.pinky",
   "version": "0.0.0-dev",
   "copyright": "Copyright © 2026 DIYgod",
   "icon": "../../assets/icon/pinky-macos-1024.png",

@@ -40,7 +40,9 @@ import (
 // nothing. A build may set it with
 // -ldflags "-X github.com/DIYgod/pinky/internal/telemetry.Endpoint=…".
 // Development builds never use it (endpoint).
-var Endpoint = "https://pinky-telemetry.rss3.workers.dev"
+// This build sends nothing: Pinky by flyfox keeps no usage statistics or
+// crash reports.
+var Endpoint = ""
 
 // EndpointEnv overrides Endpoint, for a staging backend or a test. It also
 // lets a development build send, which it otherwise never does.

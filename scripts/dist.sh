@@ -38,6 +38,9 @@
 #                    Pinky's release key for the companion APK (a PKCS12
 #                    keystore and its password), which only the release
 #                    workflow has, in its secrets: see docs/RELEASING.md
+#   PINKY_NO_COMPANION
+#                    1 builds the apps without the companion APK, as this
+#                    fork's Windows releases are for iPhones only.
 #   STRICT           1 stops rather than leave out what a release must have:
 #                    the companion APK signed with the release key, the
 #                    Windows installer, notarization,
@@ -119,6 +122,8 @@ build() {
 		fi
 		mkdir -p "$resources"
 		cp "$apk" "$resources/pinky-companion.apk"
+	elif [ "${PINKY_NO_COMPANION:-0}" = 1 ]; then
+		say "no companion APK: this build is for iPhones only (PINKY_NO_COMPANION)"
 	else
 		lacking "no companion APK at $apk (scripts/dist.sh companion): the apps will not offer to install it"
 	fi

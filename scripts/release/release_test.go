@@ -578,7 +578,7 @@ func TestManifestCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.Notes != "- One." || m.LocalizedNotes != nil || !strings.HasPrefix(m.Assets["linux-amd64"].URL, "https://github.com/DIYgod/pinky/releases/download/v2026.1107.1/") {
+	if m.Notes != "- One." || m.LocalizedNotes != nil || !strings.HasPrefix(m.Assets["linux-amd64"].URL, "https://github.com/yaoqiangyao/pinky/releases/download/v2026.1107.1/") {
 		t.Errorf("latest.json without a translation = %+v", m)
 	}
 	if page := PageNotes(m); page != "- One." {
@@ -601,11 +601,39 @@ func TestManifestCommand(t *testing.T) {
 		t.Errorf("the release page:\n%s", page)
 	}
 	cask, err := os.ReadFile(filepath.Join(dir, caskFile))
-	if err != nil || !strings.Contains(string(cask), `homepage "https://github.com/DIYgod/pinky"`) {
+	if err != nil || !strings.Contains(string(cask), `homepage "https://github.com/yaoqiangyao/pinky"`) {
 		t.Errorf("%s = %s, %v", caskFile, cask, err)
 	}
 	sums, _ := os.ReadFile(filepath.Join(dir, checksumsName))
 	if !strings.Contains(string(sums), "  latest.json\n") || !strings.Contains(string(sums), "  "+caskFile+"\n") {
+		t.Errorf("SHA256SUMS = %s", sums)
+	}
+}
+
+// This fork's releases carry the Windows installer alone: the manifest
+// leaves out the other platforms (-partial) and writes no cask.
+func TestManifestWindowsOnly(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, archiveName("windows-amd64", "2026.1107.1")), []byte("exe"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changelog := filepath.Join(t.TempDir(), changelogFile)
+	write(t, changelog, changelogHead+"## 2026.1107.1 (2026-11-07)\n\n- One.\n")
+	if err := runManifest([]string{"-dir", dir, "-version", "2026.1107.1", "-changelog", changelog, "-partial"}); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(filepath.Join(dir, "latest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.Assets["windows-amd64"]; !ok || len(m.Assets) != 1 {
+		t.Errorf("latest.json's assets = %+v; want windows-amd64 alone", m.Assets)
+	}
+	if _, err := os.Stat(filepath.Join(dir, caskFile)); !os.IsNotExist(err) {
+		t.Errorf("%s was written for a release without the Mac archives: %v", caskFile, err)
+	}
+	sums, _ := os.ReadFile(filepath.Join(dir, checksumsName))
+	if !strings.Contains(string(sums), "  latest.json\n") {
 		t.Errorf("SHA256SUMS = %s", sums)
 	}
 }

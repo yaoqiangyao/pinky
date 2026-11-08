@@ -35,7 +35,7 @@ import (
 
 // The repository whose releases hold the files.
 const (
-	defaultReleasesRepo = "DIYgod/pinky"
+	defaultReleasesRepo = "yaoqiangyao/pinky"
 	changelogFile       = "CHANGELOG.md"
 	configFile          = "cmd/pinky/mygo.json"
 )
@@ -517,13 +517,16 @@ func runManifest(args []string) error {
 	if err := writeJSON(filepath.Join(*dir, "latest.json"), m); err != nil {
 		return err
 	}
-	// The tap takes the cask from the latest release.
-	cask, err := Cask(m, *repo)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(*dir, caskFile), []byte(cask), 0o644); err != nil {
-		return err
+	// The tap takes the cask from the latest release; a release without
+	// the Mac archives, such as this fork's Windows-only ones, has none.
+	if _, mac := m.Assets["darwin-arm64"]; mac {
+		cask, err := Cask(m, *repo)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(*dir, caskFile), []byte(cask), 0o644); err != nil {
+			return err
+		}
 	}
 	return WriteChecksums(*dir)
 }

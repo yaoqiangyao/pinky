@@ -12,7 +12,7 @@ import (
 // GitHub account. The issue is public.
 const (
 	// IssueRepo is the repository that takes feedback.
-	IssueRepo = "DIYgod/pinky"
+	IssueRepo = "yaoqiangyao/pinky"
 	// IssueTemplate is its issue form, .github/ISSUE_TEMPLATE/feedback.yml;
 	// the query parameters below fill its fields by id.
 	IssueTemplate = "feedback.yml"

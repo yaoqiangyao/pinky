@@ -23,7 +23,7 @@ import (
 // Repo is the GitHub repository whose releases carry Pinky's builds and
 // the feed, latest.json (docs/RELEASING.md). It must be public: Pinky
 // fetches without credentials.
-const Repo = "DIYgod/pinky"
+const Repo = "yaoqiangyao/pinky"
 
 // FeedEnv overrides the feed's URL, for tests and staging feeds, such as
 // http://127.0.0.1:8080/latest.json.
