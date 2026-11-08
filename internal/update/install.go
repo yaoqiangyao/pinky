@@ -7,7 +7,7 @@ import (
 
 // BundleID is Pinky's identifier: Pinky.app's, and the name of its
 // installer's entry in Settings › Apps on Windows.
-const BundleID = "app.pinky.desktop"
+const BundleID = "com.flyfox.pinky"
 
 // Release is a newer version with a build for this computer.
 type Release struct {

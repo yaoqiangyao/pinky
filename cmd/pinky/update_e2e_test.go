@@ -141,7 +141,7 @@ func buildBundle(t *testing.T, app, version, sign string) {
 		"-X github.com/egoist/mygo.production=1",
 		"-X github.com/egoist/mygo.packageName=Pinky",
 		"-X github.com/egoist/mygo.packageVersion=" + version,
-		"-X github.com/egoist/mygo.packageIdentifier=app.pinky.desktop",
+		"-X github.com/egoist/mygo.packageIdentifier=com.flyfox.pinky",
 	}, " ")
 	b := exec.Command("go", "build", "-tags", "e2e", "-ldflags", ldflags, "-o", exe, ".")
 	b.Env = append(os.Environ(), "CGO_ENABLED=0")
@@ -153,7 +153,7 @@ func buildBundle(t *testing.T, app, version, sign string) {
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>Pinky</string>
 <key>CFBundleDisplayName</key><string>Pinky</string>
-<key>CFBundleIdentifier</key><string>app.pinky.desktop</string>
+<key>CFBundleIdentifier</key><string>com.flyfox.pinky</string>
 <key>CFBundleExecutable</key><string>Pinky</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>` + version + `</string>

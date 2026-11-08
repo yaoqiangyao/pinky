@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -459,5 +460,22 @@ func TestDownloadStalls(t *testing.T) {
 	}
 	if d := time.Since(start); d > 5*time.Second {
 		t.Errorf("took %v to notice", d)
+	}
+}
+
+// BundleID names Pinky's entry in Settings › Apps, which the installer
+// makes from cmd/pinky/mygo.json's identifier: they must agree, or a
+// Windows update cannot find the installed Pinky.
+func TestBundleIDIsTheAppsIdentifier(t *testing.T) {
+	b, err := os.ReadFile("../../cmd/pinky/mygo.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var app struct{ Identifier string }
+	if err := json.Unmarshal(b, &app); err != nil {
+		t.Fatal(err)
+	}
+	if app.Identifier != BundleID {
+		t.Errorf("mygo.json's identifier is %q, BundleID %q", app.Identifier, BundleID)
 	}
 }
