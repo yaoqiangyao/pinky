@@ -2,6 +2,10 @@
 
 Pinky 每个版本给用户带来了哪些变化，最新的在最前面。版本号是发布当天的日期（Asia/Shanghai 时区）加上当天的序号：2026.1107.2 是 2026 年 11 月 7 日的第二个版本。还没发布的说明先放在“Unreleased”下面，由下一个版本带走。英文版见 [CHANGELOG.md](CHANGELOG.md)；发布流程见 [docs/RELEASING.md](docs/RELEASING.md)。
 
+## Unreleased
+
+- flyfox 版的安装包把 Pinky 登记为 com.flyfox.pinky，Windows 上的自动更新现在能找到已安装的 Pinky 了。
+
 ## 2026.1109.1 (2026-11-09)
 
 - 有些 iOS 27 的 iPhone 不报告屏幕是否亮着，现在从电脑也能解锁这类 iPhone。
