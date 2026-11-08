@@ -39,8 +39,12 @@ env:
 jobs:
   linux-windows:
     name: Windows build
-    runs-on: ubuntu-latest
-    # FFmpeg and adb, when the cache has none, take about 15.
+    # The fork's build machine, debian-lan (192.168.89.130): a self-hosted
+    # runner with Docker and NSIS that keeps FFmpeg's and adb's builds in
+    # ~/.cache/pinky-release between releases, so only the first build
+    # makes them (about 15 minutes). Only this workflow, which runs for tags
+    # and by hand, may use it: never pull requests.
+    runs-on: [self-hosted, linux, x64, pinky-build]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -50,20 +54,16 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install NSIS, for the Windows installer, and ffmpeg, which makes the test streams
+          cache: false
+      - name: Check the build machine's tools
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends nsis ffmpeg >/dev/null
-      - name: Cache FFmpeg
-        uses: actions/cache@v6
-        with:
-          path: build/ffmpeg-dist
-          key: ffmpeg-windows-linux-${{ hashFiles('scripts/ffmpeg.sh') }}
-      - name: Cache adb
-        uses: actions/cache@v6
-        with:
-          path: build/adb-dist
-          key: adb-windows-linux-${{ hashFiles('scripts/adb.sh', 'scripts/adb/**') }}
+          for c in docker makensis zip unzip; do
+            command -v "$c" >/dev/null || { echo "::error::$c is missing on the build machine"; exit 1; }
+          done
+          docker info --format 'Docker {{.ServerVersion}}'
+          mkdir -p "$HOME/.cache/pinky-release/ffmpeg" "$HOME/.cache/pinky-release/adb"
+          echo "FFMPEG_CACHE=$HOME/.cache/pinky-release/ffmpeg" >> "$GITHUB_ENV"
+          echo "ADB_CACHE=$HOME/.cache/pinky-release/adb" >> "$GITHUB_ENV"
       - name: Build
         env:
           STRICT: "1"
