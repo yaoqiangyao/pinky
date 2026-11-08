@@ -11,15 +11,16 @@ import (
 
 // fakePhone is a phone on its lock screen, for the unlock logic.
 type fakePhone struct {
-	on         bool
-	wakeOnHome bool
-	isLocked   bool
-	passcode   string
-	padOnSwipe bool
-	padAt      int  // the pad shows from this swipe on (0: padOnSwipe decides)
-	sleepsOff  int  // the screen goes dark again after this many swipes (0: never)
-	faceID     bool // the swipe unlocks it
-	unlockAt   int  // Face ID unlocks it after this many keys (0: never)
+	on          bool
+	wakeOnHome  bool
+	isLocked    bool
+	passcode    string
+	padOnSwipe  bool
+	padAt       int  // the pad shows from this swipe on (0: padOnSwipe decides)
+	sleepsOff   int  // the screen goes dark again after this many swipes (0: never)
+	faceID      bool // the swipe unlocks it
+	unlockAt    int  // Face ID unlocks it after this many keys (0: never)
+	noBacklight bool // its display info has no backlight state
 
 	home, swipes int
 	keys         []keyStroke
@@ -32,8 +33,13 @@ type fakePhone struct {
 
 func (f *fakePhone) freshAX() { f.fresh++ }
 
-func (f *fakePhone) screenOn(context.Context) (bool, error) { return f.on, nil }
-func (f *fakePhone) locked(context.Context) (bool, error)   { return f.isLocked, nil }
+func (f *fakePhone) screenOn(context.Context) (bool, error) {
+	if f.noBacklight {
+		return screenAwake("")
+	}
+	return f.on, nil
+}
+func (f *fakePhone) locked(context.Context) (bool, error) { return f.isLocked, nil }
 
 func (f *fakePhone) pressHome(context.Context) error {
 	f.home++
@@ -243,6 +249,36 @@ func TestUnlock(t *testing.T) {
 			t.Errorf("err %v, swipes %d, keys %d; want an error and nothing else", err, f.swipes, len(f.keys))
 		}
 	})
+	t.Run("no backlight state", func(t *testing.T) {
+		f := lockedPhone("123456")
+		f.noBacklight = true
+		if err := unlock(ctx, f, "123456"); err != nil {
+			t.Fatal(err)
+		}
+		if f.home != 1 || f.swipes != 1 || len(f.keys) != 6 || f.slept < wakeWait {
+			t.Errorf("home %d, swipes %d, keys %d, slept %v; want Home, a wait, one swipe and one passcode", f.home, f.swipes, len(f.keys), f.slept)
+		}
+	})
+	t.Run("no backlight state, the pad on the second swipe", func(t *testing.T) {
+		f := lockedPhone("123456")
+		f.noBacklight = true
+		f.padAt = 2
+		if err := unlock(ctx, f, "123456"); err != nil {
+			t.Fatal(err)
+		}
+		if f.home != 2 || f.swipes != 2 || len(f.keys) != 6 {
+			t.Errorf("home %d, swipes %d, keys %d; want Home before each swipe", f.home, f.swipes, len(f.keys))
+		}
+	})
+	t.Run("no backlight state, already unlocked", func(t *testing.T) {
+		f := &fakePhone{on: true, noBacklight: true}
+		if err := unlock(ctx, f, "123456"); err != nil {
+			t.Fatal(err)
+		}
+		if f.home != 0 || f.swipes != 0 || len(f.keys) != 0 {
+			t.Errorf("touched an unlocked phone: home %d, swipes %d, keys %d", f.home, f.swipes, len(f.keys))
+		}
+	})
 	t.Run("untypable passcode", func(t *testing.T) {
 		f := lockedPhone("密码1234")
 		err := unlock(ctx, f, "密码1234")
@@ -257,6 +293,9 @@ func TestUnlock(t *testing.T) {
 
 func TestWake(t *testing.T) {
 	ctx := context.Background()
+	if err := wake(ctx, &fakePhone{noBacklight: true, wakeOnHome: true}); !errors.Is(err, errUnknownBacklight) {
+		t.Errorf("no backlight state: %v; want errUnknownBacklight, and no Home outside unlocking", err)
+	}
 	f := &fakePhone{on: true, wakeOnHome: true}
 	if err := wake(ctx, f); err != nil || f.home != 0 {
 		t.Errorf("screen on: err %v, home %d; want nothing pressed", err, f.home)
@@ -278,8 +317,8 @@ func TestScreenAwake(t *testing.T) {
 			t.Errorf("%s: %v, %v; want %v", state, got, err, want)
 		}
 	}
-	if _, err := screenAwake(""); err == nil {
-		t.Error("an empty state was accepted")
+	if _, err := screenAwake(""); !errors.Is(err, errUnknownBacklight) {
+		t.Errorf("an empty state: %v; want errUnknownBacklight", err)
 	}
 }
 

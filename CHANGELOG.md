@@ -2,6 +2,10 @@
 
 What changed for people in each release of Pinky, newest first. A version is the release's date in Asia/Shanghai and that day's count: 2026.1107.2 is the second release of 7 November 2026. Notes wait under "Unreleased" until the next release takes them; see [docs/RELEASING.md](docs/RELEASING.md).
 
+## Unreleased
+
+- Unlocking an iPhone from the computer now works when the phone doesn't say whether its screen is on, as some iPhones on iOS 27 do.
+
 ## 2026.1108.24 (2026-11-08)
 
 - When a phone isn't on your tailnet, Settings › Phones now says whether Tailscale isn't connected on it or is signed in to another account, with Set up Tailscale to open the steps.
