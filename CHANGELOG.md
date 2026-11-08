@@ -2,7 +2,7 @@
 
 What changed for people in each release of Pinky, newest first. A version is the release's date in Asia/Shanghai and that day's count: 2026.1107.2 is the second release of 7 November 2026. Notes wait under "Unreleased" until the next release takes them; see [docs/RELEASING.md](docs/RELEASING.md).
 
-## Unreleased
+## 2026.1109.1 (2026-11-09)
 
 - Unlocking an iPhone from the computer now works when the phone doesn't say whether its screen is on, as some iPhones on iOS 27 do.
 - Pinky now comes from flyfox's fork, yaoqiangyao/pinky, for Windows and iPhones on iOS 27 or later. It updates from there, and Help › Send Feedback… opens an issue there.
