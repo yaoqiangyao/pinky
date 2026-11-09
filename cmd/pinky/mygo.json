@@ -4,6 +4,7 @@
   "identifier": "com.flyfox.pinky",
   "version": "0.0.0-dev",
   "copyright": "Copyright © 2026 DIYgod",
+  "publisher": "flyfox",
   "icon": "../../assets/icon/pinky-macos-1024.png",
   "out": "../../build/pinky",
   "i18n": { "dir": "locales", "source": "en" },

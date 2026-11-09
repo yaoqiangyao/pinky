@@ -2,6 +2,10 @@
 
 What changed for people in each release of Pinky, newest first. A version is the release's date in Asia/Shanghai and that day's count: 2026.1107.2 is the second release of 7 November 2026. Notes wait under "Unreleased" until the next release takes them; see [docs/RELEASING.md](docs/RELEASING.md).
 
+## Unreleased
+
+- Windows now lists flyfox as Pinky's publisher, in Installed apps and in Pinky.exe's properties.
+
 ## 2026.1109.9 (2026-11-09)
 
 - On Windows, an iPhone now keeps working over Wi-Fi when you unplug its cable, instead of going offline or waiting as "Locked on Wi-Fi" though it was unlocked.
