@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -234,7 +235,7 @@ func (s *findState) tick(ctx context.Context) {
 
 	// The phones on the network, and whether they answer: those whose
 	// record matched, now or before, and those listed.
-	found := map[string]netip.Addr{}
+	addrs := map[string][]netip.Addr{}
 	for _, svc := range s.src.Services() {
 		id := Match(svc, known)
 		if id != "" {
@@ -245,7 +246,11 @@ func (s *findState) tick(ctx context.Context) {
 		if id == "" {
 			continue
 		}
-		if addr, ok := ipv4(svc); ok {
+		addrs[id] = append(addrs[id], ipv4s(svc)...)
+	}
+	found := map[string]netip.Addr{}
+	for id, list := range addrs {
+		if addr, ok := pickAddr(list, s.listed[id]); ok {
 			found[id] = addr
 		}
 	}
@@ -363,15 +368,52 @@ func (s *findState) nextProbe(now time.Time, id string, addr netip.Addr, ok bool
 	return probeState{addr: addr, ok: ok, every: every, next: now.Add(every)}
 }
 
-// ipv4 returns the service's IPv4 address. Link-local IPv6 addresses need
-// an interface to dial, which usbmuxd's clients do not give.
-func ipv4(s mdns.Service) (netip.Addr, bool) {
+// ipv4s returns the service's IPv4 addresses. Link-local IPv6 addresses
+// need an interface to dial, which usbmuxd's clients do not give.
+func ipv4s(s mdns.Service) []netip.Addr {
+	var out []netip.Addr
 	for _, a := range s.Addrs {
 		if a.Is4() {
-			return a, true
+			out = append(out, a)
 		}
 	}
-	return netip.Addr{}, false
+	return out
+}
+
+// phoneLink is the network an iPhone makes with a computer on its cable
+// (and for its Personal Hotspot), where the phone is 172.20.10.1. On a
+// cable the phone answers the search there too, and lockdown answers there,
+// but it is not Wi-Fi and it goes with the cable: with both, the phone's
+// address flipped between the two every few seconds, a new attach each
+// time (Windows, "Apple Mobile Device Ethernet", 2026-11-09).
+var phoneLink = netip.MustParsePrefix("172.20.10.0/28")
+
+// pickAddr picks the address a phone is listed at among those it answered
+// with: one outside phoneLink when there is one, and the one it is listed
+// at (last) while that is still among the best, so it does not move.
+func pickAddr(addrs []netip.Addr, last netip.Addr) (netip.Addr, bool) {
+	var best []netip.Addr
+	for _, a := range addrs {
+		if !phoneLink.Contains(a) {
+			best = append(best, a)
+		}
+	}
+	if len(best) == 0 && last.IsValid() && !phoneLink.Contains(last) {
+		// Its record on Wi-Fi is missing for a moment: lockdown at the
+		// last address decides, as for a record that is missing.
+		return last, true
+	}
+	if len(best) == 0 {
+		best = addrs
+	}
+	if len(best) == 0 {
+		return netip.Addr{}, false
+	}
+	if slices.Contains(best, last) {
+		return last, true
+	}
+	slices.SortFunc(best, netip.Addr.Compare)
+	return best[0], true
 }
 
 // Match returns the UDID of the phone that advertises svc for this
@@ -492,5 +534,17 @@ func PairedUDIDs(dir string) []string {
 	return out
 }
 
-// LockdownDir is where libimobiledevice's usbmuxd keeps pair records.
-var LockdownDir = filepath.FromSlash("/var/lib/lockdown")
+// LockdownDir is where the system's usbmuxd keeps pair records:
+// libimobiledevice's on Linux, Apple's (Apple Devices, iTunes) on Windows.
+var LockdownDir = lockdownDir()
+
+func lockdownDir() string {
+	if runtime.GOOS == "windows" {
+		base := os.Getenv("ProgramData")
+		if base == "" {
+			base = `C:\ProgramData`
+		}
+		return filepath.Join(base, "Apple", "Lockdown")
+	}
+	return filepath.FromSlash("/var/lib/lockdown")
+}

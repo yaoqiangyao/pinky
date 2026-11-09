@@ -13,6 +13,7 @@ package netmux
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -51,6 +52,13 @@ type Mux struct {
 	// DialTimeout bounds connecting to a phone on the network.
 	DialTimeout time.Duration
 
+	// Heartbeat keeps the heartbeat of every listed phone going
+	// (heartbeat.go), through the usbmuxd go-ios uses, so set it once
+	// USBMUXD_SOCKET_ADDRESS points at this Mux. HeartbeatFn connects to a
+	// phone's heartbeat service instead; for tests.
+	Heartbeat   bool
+	HeartbeatFn func(p Phone, id int) (heartbeatConn, error)
+
 	// PairDir is where the system's usbmuxd keeps pair records
 	// (LockdownDir). The Mux reads them there while that usbmuxd is not
 	// running: libimobiledevice's exits once no phone is on a cable
@@ -58,10 +66,12 @@ type Mux struct {
 	PairDir string
 }
 
-// netPhone is a listed phone and the DeviceID it was given.
+// netPhone is a listed phone, the DeviceID it was given, and what ends
+// its heartbeat.
 type netPhone struct {
 	Phone
-	id int
+	id   int
+	stop context.CancelFunc
 }
 
 // firstNetworkID is the first DeviceID a phone on the network gets, far
@@ -81,7 +91,8 @@ func New(upstream string, log *slog.Logger) *Mux {
 
 // SetPhones sets the phones on the network. A phone keeps its DeviceID
 // while it stays at its address; one that comes back, or moves, gets a new
-// one, as with usbmuxd, so the phone's users see a new attach.
+// one, as with usbmuxd, so the phone's users see a new attach. The Mux
+// keeps each listed phone's heartbeat going (heartbeat.go).
 func (m *Mux) SetPhones(list []Phone) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -91,8 +102,19 @@ func (m *Mux) SetPhones(list []Phone) {
 			next[p.UDID] = old
 			continue
 		}
-		next[p.UDID] = netPhone{Phone: p, id: m.nextID}
+		np := netPhone{Phone: p, id: m.nextID}
 		m.nextID++
+		if m.Heartbeat {
+			ctx, cancel := context.WithCancel(context.Background())
+			np.stop = cancel
+			go m.heartbeat(ctx, p, np.id)
+		}
+		next[p.UDID] = np
+	}
+	for id, old := range m.phones {
+		if np, ok := next[id]; (!ok || np.id != old.id) && old.stop != nil {
+			old.stop()
+		}
 	}
 	m.phones = next
 }

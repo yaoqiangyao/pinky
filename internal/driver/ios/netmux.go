@@ -14,9 +14,11 @@ import (
 	goios "github.com/danielpaulus/go-ios/ios"
 )
 
-// Phones over Wi-Fi on Linux. libimobiledevice's usbmuxd, the one Linux
-// systems have, lists phones on a cable only, so a phone that Pinky used
-// went offline when it was unplugged instead of moving to Wi-Fi. With
+// Phones over Wi-Fi on Linux and Windows. libimobiledevice's usbmuxd, the
+// one Linux systems have, lists phones on a cable only, and Apple's on
+// Windows lists a phone on Wi-Fi only while it is on a cable too, so a
+// phone that Pinky used went offline when it was unplugged instead of
+// moving to Wi-Fi. With
 // Provider.WiFiMux, while Pinky uses phones over Wi-Fi, the provider runs a
 // usbmuxd of its own (the package netmux) in front of the system's: it
 // hands it everything about phones on a cable, and adds the phones it finds
@@ -48,7 +50,7 @@ type muxState struct {
 // wifiMux starts the usbmuxd of its own and the search when Pinky uses
 // phones over Wi-Fi, and stops the search when it no longer does.
 func (p *Provider) wifiMux(on bool) {
-	if !p.WiFiMux || (runtime.GOOS != "linux" && !p.nmux.anyOS) {
+	if !p.WiFiMux || (!ownMuxOS() && !p.nmux.anyOS) {
 		return
 	}
 	m := &p.nmux
@@ -89,6 +91,19 @@ func (p *Provider) startMuxLocked() {
 		return
 	}
 	upstream := goios.GetUsbmuxdSocket()
+	if runtime.GOOS == "windows" && m.dir == "" {
+		// Apple's usbmuxd listens on a TCP port on Windows, and go-ios
+		// dials one as well; a unix socket's file there can outlive a
+		// Pinky that was killed and then refuse the next one.
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			m.skipped = true
+			p.logger().Warn("iphone: cannot look for phones on Wi-Fi", "err", err)
+			return
+		}
+		p.serveMuxLocked(upstream, l, "tcp://"+l.Addr().String())
+		return
+	}
 	dir := m.dir
 	if dir == "" {
 		base := os.Getenv("XDG_RUNTIME_DIR")
@@ -110,10 +125,28 @@ func (p *Provider) startMuxLocked() {
 		p.logger().Warn("iphone: cannot look for phones on Wi-Fi", "err", err)
 		return
 	}
+	p.serveMuxLocked(upstream, l, "unix://"+path)
+}
+
+// serveMuxLocked runs the usbmuxd of its own on l, in front of upstream,
+// and points go-ios at it (addr). The caller holds p.nmux.mu.
+func (p *Provider) serveMuxLocked(upstream string, l net.Listener, addr string) {
+	m := &p.nmux
 	m.mux = netmux.New(upstream, p.logger())
 	go m.mux.Serve(l)
-	os.Setenv("USBMUXD_SOCKET_ADDRESS", "unix://"+path)
+	os.Setenv("USBMUXD_SOCKET_ADDRESS", addr)
+	// Phones on the network close developer services without it
+	// (netmux/heartbeat.go). Not in tests, which list made-up phones.
+	m.mux.Heartbeat = m.dir == ""
 	p.logger().Info("iphone: looking for iPhones and iPads on Wi-Fi itself; this computer's usbmuxd lists phones on a cable only", "usbmuxd", upstream)
+}
+
+// ownMuxOS reports whether Pinky looks for phones on Wi-Fi itself on this
+// system: on Linux, whose usbmuxd lists phones on a cable only, and on
+// Windows, whose Apple usbmuxd lists an iPhone on Wi-Fi only while it is
+// on a cable too (an iPhone 18 Pro Max on iOS 27.2, 2026-11-09).
+func ownMuxOS() bool {
+	return runtime.GOOS == "linux" || runtime.GOOS == "windows"
 }
 
 // pairedUDIDs returns the phones this computer paired with: those with a
