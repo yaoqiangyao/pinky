@@ -2,7 +2,7 @@
 
 Pinky 每个版本给用户带来了哪些变化，最新的在最前面。版本号是发布当天的日期（Asia/Shanghai 时区）加上当天的序号：2026.1107.2 是 2026 年 11 月 7 日的第二个版本。还没发布的说明先放在“Unreleased”下面，由下一个版本带走。英文版见 [CHANGELOG.md](CHANGELOG.md)；发布流程见 [docs/RELEASING.md](docs/RELEASING.md)。
 
-## Unreleased
+## 2026.1109.14 (2026-11-09)
 
 - 这个版本带来了 DIYgod/pinky 从 2026.1109.8 到 2026.1109.13 的全部更新，见下文；其中安卓和 macOS 的改动与 flyfox 版无关。flyfox 自己的 2026.1109.8 到 2026.1109.10 用过同样的版本号，说明不同：Windows 把 flyfox 列为 Pinky 的发布者；Windows 上 iPhone 拔线后继续通过 Wi-Fi 使用，现在改用上游发布的实现。
 

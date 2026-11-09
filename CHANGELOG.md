@@ -2,7 +2,7 @@
 
 What changed for people in each release of Pinky, newest first. A version is the release's date in Asia/Shanghai and that day's count: 2026.1107.2 is the second release of 7 November 2026. Notes wait under "Unreleased" until the next release takes them; see [docs/RELEASING.md](docs/RELEASING.md).
 
-## Unreleased
+## 2026.1109.14 (2026-11-09)
 
 - This release brings in all of DIYgod/pinky's updates from 2026.1109.8 to 2026.1109.13, described below; Android and macOS changes among them don't apply to flyfox's build. flyfox's own releases 2026.1109.8 to 2026.1109.10 had other notes under the same numbers: Windows names flyfox as Pinky's publisher, and iPhones keep working over Wi-Fi on Windows, now in the form upstream released.
 
