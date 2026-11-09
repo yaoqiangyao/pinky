@@ -14,12 +14,13 @@ type rtpPacket struct {
 	TS      uint32
 	SSRC    uint32
 	Payload []byte
+	Ext     []byte // the header extension: its profile, length and data
 }
 
 var errShortRTP = errors.New("short RTP packet")
 
-// parseRTP parses an RTP header (RFC 3550): CSRCs, a header extension and
-// padding are skipped.
+// parseRTP parses an RTP header (RFC 3550): CSRCs and padding are
+// skipped, a header extension is kept as it is.
 func parseRTP(b []byte) (rtpPacket, error) {
 	if len(b) < 12 || b[0]>>6 != 2 {
 		return rtpPacket{}, errShortRTP
@@ -39,10 +40,12 @@ func parseRTP(b []byte) (rtpPacket, error) {
 		if len(b) < n+4 {
 			return rtpPacket{}, errShortRTP
 		}
+		start := n
 		n += 4 + 4*int(binary.BigEndian.Uint16(b[n+2:n+4]))
 		if len(b) < n {
 			return rtpPacket{}, errShortRTP
 		}
+		p.Ext = b[start:n]
 	}
 	end := len(b)
 	if b[0]&0x20 != 0 {

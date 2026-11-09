@@ -1,0 +1,2 @@
+/* Asked when Pinky first looks for phones on the local network (System Settings › Privacy & Security › Local Network). */
+"NSLocalNetworkUsageDescription" = "Pinky はこのネットワーク上でお使いのスマホを探し、Wi-Fi で接続します。Android スマホのペアリングや、この Mac の一覧から消えた iPhone と iPad を見つけるために使います。";

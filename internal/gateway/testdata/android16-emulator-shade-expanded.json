@@ -1,0 +1,474 @@
+{
+  "display": {
+    "id": 0,
+    "width": 1080,
+    "height": 2400,
+    "density_dpi": 420,
+    "rotation": 0
+  },
+  "locked": false,
+  "secure_locked": false,
+  "windows": [
+    {
+      "id": 67,
+      "type": "system",
+      "layer": 0,
+      "bounds": [
+        0,
+        0,
+        1080,
+        2400
+      ],
+      "active": true,
+      "focused": true,
+      "package": "com.android.systemui",
+      "root": {
+        "class": "android.widget.FrameLayout",
+        "id": "com.android.systemui:id/legacy_window_root",
+        "bounds": [
+          0,
+          0,
+          1080,
+          2400
+        ],
+        "node": 51930,
+        "children": [
+          {
+            "class": "android.widget.ScrollView",
+            "id": "com.android.systemui:id/notification_stack_scroller",
+            "bounds": [
+              0,
+              0,
+              1080,
+              2316
+            ],
+            "node": 160523,
+            "children": [
+              {
+                "class": "android.widget.FrameLayout",
+                "id": "com.android.systemui:id/expandableNotificationRow",
+                "bounds": [
+                  42,
+                  570,
+                  1038,
+                  877
+                ],
+                "long_clickable": true,
+                "focusable": true,
+                "node": 1257024,
+                "children": [
+                  {
+                    "class": "android.view.ViewGroup",
+                    "id": "android:id/notification_top_line",
+                    "bounds": [
+                      42,
+                      570,
+                      891,
+                      717
+                    ],
+                    "node": 1294503,
+                    "children": [
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "Shell",
+                        "id": "android:id/app_name_text",
+                        "bounds": [
+                          179,
+                          622,
+                          249,
+                          665
+                        ],
+                        "node": 1295464
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "•",
+                        "id": "android:id/time_divider",
+                        "bounds": [
+                          259,
+                          622,
+                          270,
+                          665
+                        ],
+                        "node": 1300269
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "now",
+                        "id": "android:id/time",
+                        "bounds": [
+                          280,
+                          622,
+                          340,
+                          665
+                        ],
+                        "node": 1301230
+                      },
+                      {
+                        "class": "android.widget.ImageView",
+                        "desc": "Alerted",
+                        "id": "android:id/alerted_icon",
+                        "bounds": [
+                          356,
+                          630,
+                          388,
+                          662
+                        ],
+                        "node": 1306035
+                      }
+                    ]
+                  },
+                  {
+                    "class": "android.widget.Button",
+                    "desc": "Collapse",
+                    "id": "android:id/expand_button",
+                    "bounds": [
+                      891,
+                      570,
+                      1038,
+                      717
+                    ],
+                    "clickable": true,
+                    "focusable": true,
+                    "node": 1307957
+                  },
+                  {
+                    "class": "android.widget.TextView",
+                    "text": "Card statement ready",
+                    "id": "android:id/title",
+                    "bounds": [
+                      179,
+                      701,
+                      996,
+                      758
+                    ],
+                    "node": 1314684
+                  },
+                  {
+                    "class": "android.widget.TextView",
+                    "text": "Your balance is 1,234.56, due 12 Nov",
+                    "id": "android:id/big_text",
+                    "bounds": [
+                      179,
+                      774,
+                      996,
+                      825
+                    ],
+                    "node": 1316606
+                  }
+                ]
+              },
+              {
+                "class": "android.widget.TextView",
+                "text": "Silent",
+                "id": "com.android.systemui:id/header_label",
+                "bounds": [
+                  53,
+                  924,
+                  207,
+                  1050
+                ],
+                "clickable": true,
+                "focusable": true,
+                "heading": true,
+                "node": 1385798
+              },
+              {
+                "class": "android.widget.FrameLayout",
+                "id": "com.android.systemui:id/expandableNotificationRow",
+                "bounds": [
+                  42,
+                  1055,
+                  1038,
+                  1273
+                ],
+                "long_clickable": true,
+                "focusable": true,
+                "node": 1387720,
+                "children": [
+                  {
+                    "class": "android.view.ViewGroup",
+                    "id": "android:id/notification_top_line",
+                    "bounds": [
+                      179,
+                      1107,
+                      891,
+                      1158
+                    ],
+                    "node": 1397330,
+                    "children": [
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "Serial console enabled",
+                        "id": "android:id/title",
+                        "bounds": [
+                          179,
+                          1107,
+                          550,
+                          1158
+                        ],
+                        "node": 1398291
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "•",
+                        "id": "android:id/time_divider",
+                        "bounds": [
+                          560,
+                          1113,
+                          571,
+                          1156
+                        ],
+                        "node": 1404057
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "16 minutes ago",
+                        "id": "android:id/time",
+                        "bounds": [
+                          581,
+                          1113,
+                          645,
+                          1156
+                        ],
+                        "node": 1405018
+                      }
+                    ]
+                  },
+                  {
+                    "class": "android.widget.TextView",
+                    "text": "Performance is impacted. To disable, check bootloader.",
+                    "id": "android:id/text",
+                    "bounds": [
+                      179,
+                      1163,
+                      891,
+                      1216
+                    ],
+                    "node": 1412706
+                  },
+                  {
+                    "class": "android.widget.Button",
+                    "desc": "Expand",
+                    "id": "android:id/expand_button",
+                    "bounds": [
+                      891,
+                      1055,
+                      1038,
+                      1273
+                    ],
+                    "clickable": true,
+                    "focusable": true,
+                    "node": 1416550
+                  }
+                ]
+              },
+              {
+                "class": "android.widget.Button",
+                "text": "Manage",
+                "desc": "Manage",
+                "id": "com.android.systemui:id/manage_text",
+                "bounds": [
+                  84,
+                  1310,
+                  321,
+                  1436
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 1164768
+              },
+              {
+                "class": "android.widget.Button",
+                "text": "Clear all",
+                "desc": "Clear all notifications.",
+                "id": "com.android.systemui:id/dismiss_text",
+                "bounds": [
+                  759,
+                  1310,
+                  996,
+                  1436
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 1165729
+              }
+            ]
+          },
+          {
+            "class": "android.view.View",
+            "id": "com.android.systemui:id/keyguard_long_press",
+            "bounds": [
+              0,
+              0,
+              1080,
+              2400
+            ],
+            "node": 57696
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Internet, AndroidWifi",
+            "desc": "Internet,AndroidWifi",
+            "state": "On, Wifi signal full.",
+            "bounds": [
+              42,
+              128,
+              529,
+              286
+            ],
+            "clickable": true,
+            "long_clickable": true,
+            "focusable": true,
+            "node": 948543
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Bluetooth, On",
+            "desc": "Bluetooth.",
+            "state": "On, Not connected.",
+            "bounds": [
+              550,
+              128,
+              1037,
+              286
+            ],
+            "clickable": true,
+            "long_clickable": true,
+            "focusable": true,
+            "node": 957192
+          },
+          {
+            "class": "android.widget.Switch",
+            "text": "Flashlight, Off",
+            "desc": "Flashlight",
+            "state": "Off",
+            "bounds": [
+              42,
+              307,
+              529,
+              465
+            ],
+            "clickable": true,
+            "checkable": true,
+            "focusable": true,
+            "node": 965841
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Modes, No active modes",
+            "desc": "Modes. No active modes",
+            "bounds": [
+              550,
+              307,
+              1037,
+              465
+            ],
+            "clickable": true,
+            "long_clickable": true,
+            "focusable": true,
+            "node": 974490
+          },
+          {
+            "class": "android.view.ViewGroup",
+            "id": "com.android.systemui:id/split_shade_status_bar",
+            "bounds": [
+              0,
+              0,
+              1080,
+              315
+            ],
+            "focusable": true,
+            "node": 63462,
+            "children": [
+              {
+                "class": "android.widget.TextView",
+                "text": "12:18",
+                "desc": "12:18 AM",
+                "id": "com.android.systemui:id/clock",
+                "bounds": [
+                  50,
+                  0,
+                  150,
+                  126
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 70189
+              },
+              {
+                "class": "android.widget.TextView",
+                "text": "Mon, Nov 9",
+                "id": "com.android.systemui:id/date",
+                "bounds": [
+                  171,
+                  29,
+                  359,
+                  92
+                ],
+                "node": 71150
+              },
+              {
+                "class": "android.widget.LinearLayout",
+                "id": "com.android.systemui:id/hover_system_icons_container",
+                "bounds": [
+                  803,
+                  32,
+                  1027,
+                  95
+                ],
+                "node": 124966,
+                "children": [
+                  {
+                    "class": "android.widget.ImageView",
+                    "desc": "Wifi signal full.",
+                    "id": "com.android.systemui:id/wifi_signal",
+                    "bounds": [
+                      810,
+                      43,
+                      849,
+                      82
+                    ],
+                    "node": 1186871
+                  },
+                  {
+                    "class": "android.widget.FrameLayout",
+                    "desc": "T-Mobile, two bars.",
+                    "id": "com.android.systemui:id/mobile_combo",
+                    "bounds": [
+                      849,
+                      34,
+                      888,
+                      92
+                    ],
+                    "node": 142264
+                  },
+                  {
+                    "class": "android.widget.LinearLayout",
+                    "desc": "Battery charging, 100 percent.",
+                    "id": "com.android.systemui:id/batteryRemainingIcon",
+                    "bounds": [
+                      904,
+                      42,
+                      1027,
+                      85
+                    ],
+                    "node": 154757
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "root_ms": 1,
+      "walk_ms": 13,
+      "nodes": 33
+    }
+  ],
+  "nodes": 33,
+  "truncated": false,
+  "time": 1794154682687,
+  "took_ms": 16,
+  "windows_ms": 0
+}

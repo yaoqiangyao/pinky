@@ -127,6 +127,8 @@ type Device struct {
 	screenOff bool
 	// files is the Pinky folder of Android phones.
 	files map[string]file
+	// overlay is shown over every unlocked screen (SetOverlay).
+	overlay []screen.Element
 }
 
 // NewDevice returns a demo phone. Android phones use the Pixel launcher,
@@ -191,6 +193,14 @@ func (d *Device) Notify(app, text string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.events = append(d.events, screen.Event{Kind: screen.EventNotification, App: app, Text: text})
+}
+
+// SetOverlay shows elements over every unlocked screen, for tests: a
+// notification banner, or lines that only OCR reads. Nil removes them.
+func (d *Device) SetOverlay(els []screen.Element) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.overlay = append([]screen.Element(nil), els...)
 }
 
 // Show replaces the current screen, for tests: "home", "dinely", "orders",

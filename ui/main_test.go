@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/i18n"
 	mg "github.com/egoist/mygo/ui"
 )
@@ -28,6 +29,19 @@ func TestMain(m *testing.M) {
 		testLang.Store(tag)
 	}
 	os.Exit(m.Run())
+}
+
+// testLanguages are the languages of the client's catalogs, English first:
+// tests that check a layout or draw screenshots draw it in each, so a
+// longer translation that no longer fits shows up.
+func testLanguages() []string { return mygo.App.Languages() }
+
+// langShort names lang in screenshot files: "en", "zh" or "ja".
+func langShort(lang string) string {
+	if lang == "zh-Hans" {
+		return "zh"
+	}
+	return lang
 }
 
 // inLanguage shows the client's words in tag for the rest of the test, and

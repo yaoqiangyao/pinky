@@ -19,7 +19,8 @@ type File struct {
 	ReadOnly bool `yaml:"read_only"`
 	// ReadOnlyDevices turns on read-only mode for these device ids.
 	ReadOnlyDevices []string `yaml:"read_only_devices"`
-	// MaskCodes masks digit codes in notifications. Default true.
+	// MaskCodes masks one-time codes on the screen and in events, and
+	// covers them in screenshots (codes.go). Default true.
 	MaskCodes *bool  `yaml:"mask_codes"`
 	Rules     []Rule `yaml:"rules"`
 	// AlwaysAllow holds the person's "Always allow" answers to approvals

@@ -33,6 +33,12 @@ type Provider struct {
 	// (an iOS_DDI folder in it), looked in before Xcode's; "" for none.
 	DiskImageDir string
 
+	// WiFiMux lets the provider run a usbmuxd of its own on Linux, whose
+	// usbmuxd lists phones on a cable only, to find phones on Wi-Fi
+	// (netmux.go). Only the app's provider sets it: it points go-ios, for
+	// the whole process, at that usbmuxd.
+	WiFiMux bool
+
 	// Log gets a line for each step Pinky takes to prepare a phone:
 	// mounting the developer disk image, showing the Developer Mode
 	// switch, asking for trust, downloading the image. nil for none.
@@ -59,6 +65,7 @@ type Provider struct {
 
 	wifi       wifiState                                               // phones over Wi-Fi (wifi.go)
 	lost       lostState                                               // phones usbmuxd lost on Wi-Fi (lost.go)
+	nmux       muxState                                                // a usbmuxd of its own on Linux (netmux.go)
 	restartFn  func(ctx context.Context, command, reason string) error // for tests: runAsAdmin
 	prep       preparer                                                // Developer Mode and the developer disk image (prepare.go)
 	muxErr     error                                                   // usbmuxd's answer to the last List
@@ -180,13 +187,24 @@ func (p *Provider) List(ctx context.Context) ([]driver.Info, error) {
 	p.remember(kept)
 	// Phones usbmuxd lost on Wi-Fi though they are on the network (lost.go).
 	onMux := map[string]bool{}
+	onNet := map[string]bool{}
+	onUSB := map[string]bool{}
 	for _, e := range list {
 		onMux[e.Properties.SerialNumber] = true
+		if e.Properties.ConnectionType == "Network" {
+			onNet[e.Properties.SerialNumber] = true
+		} else {
+			onUSB[e.Properties.SerialNumber] = true
+		}
 	}
-	for _, info := range p.lostPhones(onMux) {
+	for _, info := range p.lostPhones(onMux, onUSB, onNet) {
 		if !ids[info.ID] && (p.Only == nil || p.Only[info.ID]) {
 			kept = append(kept, info)
 		}
+	}
+	// What each one's Wi-Fi connection is (wifiallow.go).
+	for i := range kept {
+		kept[i].WiFi = p.wifiConnection(kept[i].ID, onNet[kept[i].ID])
 	}
 	return kept, nil
 }
@@ -278,11 +296,6 @@ func (p *Provider) forgetExcept(entries []goios.DeviceEntry) {
 	for id := range p.known {
 		if !listed[id] {
 			delete(p.known, id)
-		}
-	}
-	for id, a := range p.wifi.allowed {
-		if !listed[id] && !a.running {
-			delete(p.wifi.allowed, id)
 		}
 	}
 	for id, f := range p.wifi.found {

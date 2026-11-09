@@ -223,11 +223,20 @@ func unlock(ctx context.Context, conn *dbus.Conn, coll dbus.ObjectPath) error {
 
 // lock locks the collection again. Locking needs no answer from the
 // person; a Secret Service that wants one gets none, and the collection
-// stays as it is.
+// stays as it is. KWallet's refuses to lock a collection that is locked
+// already, which is no failure.
 func lock(conn *dbus.Conn, coll dbus.ObjectPath) error {
 	var locked []dbus.ObjectPath
 	var p dbus.ObjectPath
-	return call(conn, ssPath, ssService+".Lock", []any{&locked, &p}, []dbus.ObjectPath{coll})
+	err := call(conn, ssPath, ssService+".Lock", []any{&locked, &p}, []dbus.ObjectPath{coll})
+	if err != nil {
+		if v, perr := conn.Object(ssName, coll).GetProperty(ssCollection + ".Locked"); perr == nil {
+			if isLocked, _ := v.Value().(bool); isLocked {
+				return nil
+			}
+		}
+	}
+	return err
 }
 
 // openSession opens a session that carries secrets in the clear over the

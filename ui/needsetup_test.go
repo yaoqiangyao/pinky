@@ -76,8 +76,8 @@ func newStepsApp(t *testing.T, ps ...driver.Provider) *gwApp {
 // not offline. The sidebar, the tiles and the menu bar flyout say so, and
 // each phone's page says the step in the person's words, as its checkup
 // does, with See what's wrong and, for the iPhone, its steps in Add
-// phone. Unplugged, they are offline and say no step. In English and
-// Chinese.
+// phone. Unplugged, they are offline and say no step. In each of the
+// client's languages.
 func TestPhonesThatNeedSetup(t *testing.T) {
 	droid, ios := &stepsProvider{platform: driver.Android}, &stepsProvider{platform: driver.IOS}
 	pixel := driver.Info{ID: "px-8a", Platform: driver.Android, Name: "Pixel 8a", Model: "Pixel 8a", OSVersion: "16",
@@ -95,7 +95,7 @@ func TestPhonesThatNeedSetup(t *testing.T) {
 	})
 
 	const w, h = 1280, 820
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		tt := mg.NewTester(ga.view, w, h)
 		inLanguage(t, lang, tt)
 		status := locales.GwStatusNeedsSetup()
@@ -219,7 +219,7 @@ func TestIPhonePasscodeStep(t *testing.T) {
 	const detail = "Enter the passcode on the iPhone: iOS asks for it now and then before the WebDriverAgent helper can control the phone."
 	ta.api.SetIPhone(id, driver.Info{State: driver.StateNeedsSetup, Setup: driver.SetupPasscode, Detail: detail})
 	ta.sync()
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		tt := mg.NewTester(ta.view, 1280, 820)
 		inLanguage(t, lang, tt)
 		want := locales.AddPhoneIPhoneStepPasscodeDetail()
@@ -287,7 +287,7 @@ func TestAgentWaitsForSetupStep(t *testing.T) {
 	}
 	ga.waitFor(t, "the task", func() bool { return ga.taskOf(pixel.ID) != nil })
 	ga.selectPhone(pixel.ID)
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		tt := mg.NewTester(ga.view, 1280, 820)
 		inLanguage(t, lang, tt)
 		tt.Frame()
@@ -303,7 +303,7 @@ func TestAgentWaitsForSetupStep(t *testing.T) {
 	}()
 	ga.waitFor(t, "the handoff", func() bool { return len(ga.needs) > 0 })
 	var tt *mg.Tester
-	for _, lang := range []string{"zh-Hans", "en"} {
+	for _, lang := range append(testLanguages()[1:], "en") {
 		tt = mg.NewTester(ga.view, 1280, 820)
 		inLanguage(t, lang, tt)
 		tt.Frame()
@@ -339,7 +339,7 @@ func TestIPhoneConnectionStep(t *testing.T) {
 	const detail = "Connecting without the helper needs iOS 27 or later; this iPhone runs iOS 18.6. Choose Automatic or WebDriverAgent in Settings > Phones."
 	ta.api.SetIPhone(id, driver.Info{State: driver.StateNeedsSetup, Setup: driver.SetupConnection, Detail: detail, OSVersion: "18.6"})
 	ta.sync()
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		tt := mg.NewTester(ta.view, 1280, 820)
 		inLanguage(t, lang, tt)
 		want := locales.ConnectionChosenNeedsIOS27("18.6")

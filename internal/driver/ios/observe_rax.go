@@ -117,7 +117,13 @@ func (d *Device) observeRAX(ctx context.Context, opt driver.ObserveOptions, st *
 	// What SpringBoard shows over the app, looked at in the background
 	// while the app's tree comes (see springboard.go).
 	sbDone := d.kickSpringBoard(rax)
-	si := d.screen()
+	// The display's orientation, read while the tree comes: the person
+	// may have turned the device since the last read.
+	shown := make(chan struct{})
+	go func() {
+		defer close(shown)
+		d.readDisplayNow(ctx)
+	}()
 	var locked bool
 	lockKnown := make(chan struct{})
 	go func() {
@@ -195,16 +201,20 @@ func (d *Device) observeRAX(ctx context.Context, opt driver.ObserveOptions, st *
 		if !ok {
 			return
 		}
+		<-shown
+		si := d.screen()
 		var screens []*screen.Screen
 		for _, a := range apps {
 			screens = append(screens, &screen.Screen{Width: si.Width, Height: si.Height,
-				Orientation: orientationName(si.Orientation), App: a, Locked: locked})
+				Orientation: orientationOf(si.Width, si.Height), App: a, Locked: locked})
 		}
 		gate.early(screens)
 	}()
 	<-walked
 	<-lockKnown
 	<-asked
+	<-shown
+	si := d.screen()
 	if len(els) == 0 {
 		pictured.Wait() // a picture begun after the app is not left running
 		if walkErr == nil {
@@ -222,7 +232,7 @@ func (d *Device) observeRAX(ctx context.Context, opt driver.ObserveOptions, st *
 	app := els[0]
 	s := &screen.Screen{
 		Width: si.Width, Height: si.Height,
-		Orientation: orientationName(si.Orientation),
+		Orientation: orientationOf(si.Width, si.Height),
 		Locked:      locked,
 		CapturedAt:  time.Now(),
 	}
@@ -246,11 +256,11 @@ func (d *Device) observeRAX(ctx context.Context, opt driver.ObserveOptions, st *
 	frontSB := frontApp.ID == springBoard
 	d.noteFront(app.Object, frontSB)
 	var covered []screen.Rect
-	var dialog []screen.Element
+	var dialog, notes []screen.Element
 	if !frontSB {
 		if over, ok := d.springBoardOverlays(sbDone); ok && len(over) > 0 {
 			var dlg []raxElement
-			s.Events, covered, dlg = d.overlayEvents(ctx, over, scale, si.Width, si.Height)
+			s.Events, covered, dlg, notes = d.overlayEvents(ctx, over, scale, si.Width, si.Height)
 			dialog = dialogElements(d.springBoardElement(), dlg, scale, si.Width, si.Height)
 			st.Trace = append(st.Trace, fmt.Sprintf("SpringBoard shows %d overlays over the app", len(over)))
 		} else if ok {
@@ -258,7 +268,8 @@ func (d *Device) observeRAX(ctx context.Context, opt driver.ObserveOptions, st *
 		}
 	}
 	s.Elements, s.Keyboard = raxScreenElements(els, scale, si.Width, si.Height, s.App.ID, covered...)
-	s.Elements = append(s.Elements, dialog...)
+	// Notifications over the app come first, as they are on top.
+	s.Elements = append(append(notes, s.Elements...), dialog...)
 	if asleepRead(ctx, s, d.ScreenOn) {
 		s.Locked = true
 		lines, shot = nil, nil // a dark screen

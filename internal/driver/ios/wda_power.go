@@ -118,14 +118,15 @@ func (p *wdaPower) pressHome(ctx context.Context) error {
 // swipeUp swipes from the bottom edge to the middle of the screen, which on
 // the lock screen brings up the passcode pad.
 func (p *wdaPower) swipeUp(ctx context.Context) error {
-	x := p.d.width / 2
-	return p.d.Swipe(ctx, screen.Point{X: x, Y: p.d.height - 1}, screen.Point{X: x, Y: p.d.height / 2}, 300*time.Millisecond)
+	w, h := p.d.sizeNow(ctx)
+	x := w / 2
+	return p.d.Swipe(ctx, screen.Point{X: x, Y: h - 1}, screen.Point{X: x, Y: h / 2}, 300*time.Millisecond)
 }
 
 // keypadShown looks for the passcode pad in the tree WDA reads (SpringBoard
 // on the lock screen) and remembers where its digit keys are.
 func (p *wdaPower) keypadShown(ctx context.Context) (bool, error) {
-	root, err := p.d.c.source(ctx)
+	root, err := p.d.source(ctx)
 	if err != nil {
 		return false, err
 	}

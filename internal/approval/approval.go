@@ -461,6 +461,19 @@ func (c *Center) WithdrawWhere(f func(Info) bool, reason string) []Info {
 	return out
 }
 
+// Rebind moves the open and decided approvals f selects to another
+// session: a newer session of the agent continues the lease they belong
+// to, and repeats their calls.
+func (c *Center) Rebind(f func(Info) bool, session string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, e := range c.all {
+		if f(e.Info) {
+			e.Binding.Session = session
+		}
+	}
+}
+
 // List returns the approvals waiting for the person, oldest first. With
 // pending true it also includes decided ones that no call picked up yet.
 func (c *Center) List(pending bool) []Info {

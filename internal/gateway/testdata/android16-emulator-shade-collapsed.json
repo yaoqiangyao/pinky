@@ -1,0 +1,463 @@
+{
+  "display": {
+    "id": 0,
+    "width": 1080,
+    "height": 2400,
+    "density_dpi": 420,
+    "rotation": 0
+  },
+  "locked": false,
+  "secure_locked": false,
+  "windows": [
+    {
+      "id": 97,
+      "type": "system",
+      "layer": 0,
+      "bounds": [
+        0,
+        0,
+        1080,
+        2400
+      ],
+      "active": true,
+      "focused": true,
+      "package": "com.android.systemui",
+      "app": "System UI",
+      "root": {
+        "class": "android.widget.FrameLayout",
+        "id": "com.android.systemui:id/legacy_window_root",
+        "bounds": [
+          0,
+          0,
+          1080,
+          2400
+        ],
+        "node": 51960,
+        "children": [
+          {
+            "class": "android.widget.ScrollView",
+            "id": "com.android.systemui:id/notification_stack_scroller",
+            "bounds": [
+              0,
+              0,
+              1080,
+              2316
+            ],
+            "node": 160553,
+            "children": [
+              {
+                "class": "android.widget.FrameLayout",
+                "id": "com.android.systemui:id/expandableNotificationRow",
+                "bounds": [
+                  42,
+                  570,
+                  1038,
+                  788
+                ],
+                "long_clickable": true,
+                "focusable": true,
+                "node": 1257054,
+                "children": [
+                  {
+                    "class": "android.view.ViewGroup",
+                    "id": "android:id/notification_top_line",
+                    "bounds": [
+                      179,
+                      622,
+                      891,
+                      673
+                    ],
+                    "node": 1266664,
+                    "children": [
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "Card statement ready",
+                        "id": "android:id/title",
+                        "bounds": [
+                          179,
+                          622,
+                          534,
+                          673
+                        ],
+                        "node": 1267625
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "•",
+                        "id": "android:id/time_divider",
+                        "bounds": [
+                          544,
+                          628,
+                          555,
+                          671
+                        ],
+                        "node": 1273391
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "now",
+                        "id": "android:id/time",
+                        "bounds": [
+                          565,
+                          628,
+                          625,
+                          671
+                        ],
+                        "node": 1274352
+                      },
+                      {
+                        "class": "android.widget.ImageView",
+                        "desc": "Alerted",
+                        "id": "android:id/alerted_icon",
+                        "bounds": [
+                          641,
+                          636,
+                          673,
+                          668
+                        ],
+                        "node": 1279157
+                      }
+                    ]
+                  },
+                  {
+                    "class": "android.widget.TextView",
+                    "text": "Your balance is 1,234.56, due 12 Nov",
+                    "id": "android:id/text",
+                    "bounds": [
+                      179,
+                      678,
+                      891,
+                      731
+                    ],
+                    "node": 1282040
+                  },
+                  {
+                    "class": "android.widget.Button",
+                    "desc": "Expand",
+                    "id": "android:id/expand_button",
+                    "bounds": [
+                      891,
+                      570,
+                      1038,
+                      788
+                    ],
+                    "clickable": true,
+                    "focusable": true,
+                    "node": 1285884
+                  }
+                ]
+              },
+              {
+                "class": "android.widget.TextView",
+                "text": "Silent",
+                "id": "com.android.systemui:id/header_label",
+                "bounds": [
+                  53,
+                  835,
+                  207,
+                  961
+                ],
+                "clickable": true,
+                "focusable": true,
+                "heading": true,
+                "node": 1385828
+              },
+              {
+                "class": "android.widget.FrameLayout",
+                "id": "com.android.systemui:id/expandableNotificationRow",
+                "bounds": [
+                  42,
+                  966,
+                  1038,
+                  1184
+                ],
+                "long_clickable": true,
+                "focusable": true,
+                "node": 1387750,
+                "children": [
+                  {
+                    "class": "android.view.ViewGroup",
+                    "id": "android:id/notification_top_line",
+                    "bounds": [
+                      179,
+                      1018,
+                      891,
+                      1069
+                    ],
+                    "node": 1397360,
+                    "children": [
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "Serial console enabled",
+                        "id": "android:id/title",
+                        "bounds": [
+                          179,
+                          1018,
+                          550,
+                          1069
+                        ],
+                        "node": 1398321
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "•",
+                        "id": "android:id/time_divider",
+                        "bounds": [
+                          560,
+                          1024,
+                          571,
+                          1067
+                        ],
+                        "node": 1404087
+                      },
+                      {
+                        "class": "android.widget.TextView",
+                        "text": "16 minutes ago",
+                        "id": "android:id/time",
+                        "bounds": [
+                          581,
+                          1024,
+                          645,
+                          1067
+                        ],
+                        "node": 1405048
+                      }
+                    ]
+                  },
+                  {
+                    "class": "android.widget.TextView",
+                    "text": "Performance is impacted. To disable, check bootloader.",
+                    "id": "android:id/text",
+                    "bounds": [
+                      179,
+                      1074,
+                      891,
+                      1127
+                    ],
+                    "node": 1412736
+                  },
+                  {
+                    "class": "android.widget.Button",
+                    "desc": "Expand",
+                    "id": "android:id/expand_button",
+                    "bounds": [
+                      891,
+                      966,
+                      1038,
+                      1184
+                    ],
+                    "clickable": true,
+                    "focusable": true,
+                    "node": 1416580
+                  }
+                ]
+              },
+              {
+                "class": "android.widget.Button",
+                "text": "Manage",
+                "desc": "Manage",
+                "id": "com.android.systemui:id/manage_text",
+                "bounds": [
+                  84,
+                  1221,
+                  321,
+                  1347
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 1164798
+              },
+              {
+                "class": "android.widget.Button",
+                "text": "Clear all",
+                "desc": "Clear all notifications.",
+                "id": "com.android.systemui:id/dismiss_text",
+                "bounds": [
+                  759,
+                  1221,
+                  996,
+                  1347
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 1165759
+              }
+            ]
+          },
+          {
+            "class": "android.view.View",
+            "id": "com.android.systemui:id/keyguard_long_press",
+            "bounds": [
+              0,
+              0,
+              1080,
+              2400
+            ],
+            "node": 57726
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Internet, AndroidWifi",
+            "desc": "Internet,AndroidWifi",
+            "state": "On, Wifi signal full.",
+            "bounds": [
+              42,
+              128,
+              529,
+              286
+            ],
+            "clickable": true,
+            "long_clickable": true,
+            "focusable": true,
+            "node": 948573
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Bluetooth, On",
+            "desc": "Bluetooth.",
+            "state": "On, Not connected.",
+            "bounds": [
+              550,
+              128,
+              1037,
+              286
+            ],
+            "clickable": true,
+            "long_clickable": true,
+            "focusable": true,
+            "node": 957222
+          },
+          {
+            "class": "android.widget.Switch",
+            "text": "Flashlight, Off",
+            "desc": "Flashlight",
+            "state": "Off",
+            "bounds": [
+              42,
+              307,
+              529,
+              465
+            ],
+            "clickable": true,
+            "checkable": true,
+            "focusable": true,
+            "node": 965871
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Modes, No active modes",
+            "desc": "Modes. No active modes",
+            "bounds": [
+              550,
+              307,
+              1037,
+              465
+            ],
+            "clickable": true,
+            "long_clickable": true,
+            "focusable": true,
+            "node": 974520
+          },
+          {
+            "class": "android.view.ViewGroup",
+            "id": "com.android.systemui:id/split_shade_status_bar",
+            "bounds": [
+              0,
+              0,
+              1080,
+              315
+            ],
+            "focusable": true,
+            "node": 63492,
+            "children": [
+              {
+                "class": "android.widget.TextView",
+                "text": "12:18",
+                "desc": "12:18 AM",
+                "id": "com.android.systemui:id/clock",
+                "bounds": [
+                  50,
+                  0,
+                  150,
+                  126
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 70219
+              },
+              {
+                "class": "android.widget.TextView",
+                "text": "Mon, Nov 9",
+                "id": "com.android.systemui:id/date",
+                "bounds": [
+                  171,
+                  29,
+                  359,
+                  92
+                ],
+                "node": 71180
+              },
+              {
+                "class": "android.widget.LinearLayout",
+                "id": "com.android.systemui:id/hover_system_icons_container",
+                "bounds": [
+                  803,
+                  32,
+                  1027,
+                  95
+                ],
+                "node": 124996,
+                "children": [
+                  {
+                    "class": "android.widget.ImageView",
+                    "desc": "Wifi signal full.",
+                    "id": "com.android.systemui:id/wifi_signal",
+                    "bounds": [
+                      810,
+                      43,
+                      849,
+                      82
+                    ],
+                    "node": 1186901
+                  },
+                  {
+                    "class": "android.widget.FrameLayout",
+                    "desc": "T-Mobile, one bar.",
+                    "id": "com.android.systemui:id/mobile_combo",
+                    "bounds": [
+                      849,
+                      34,
+                      888,
+                      92
+                    ],
+                    "node": 142294
+                  },
+                  {
+                    "class": "android.widget.LinearLayout",
+                    "desc": "Battery charging, 100 percent.",
+                    "id": "com.android.systemui:id/batteryRemainingIcon",
+                    "bounds": [
+                      904,
+                      42,
+                      1027,
+                      85
+                    ],
+                    "node": 154787
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "root_ms": 1,
+      "walk_ms": 18,
+      "nodes": 32
+    }
+  ],
+  "nodes": 32,
+  "truncated": false,
+  "time": 1794154693537,
+  "took_ms": 19,
+  "windows_ms": 0
+}

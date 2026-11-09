@@ -146,7 +146,7 @@ func TestTrustOverWiFi(t *testing.T) {
 }
 
 // TestWiFiScreenshots draws a phone found on Wi-Fi (its page, Settings ›
-// Phones and Add phone › iPhone), in English and Simplified Chinese, into
+// Phones and Add phone › iPhone), in each of the client's languages, into
 // $PINKY_SCREENSHOTS:
 //
 //	PINKY_SCREENSHOTS=dir go test ./ui -run TestWiFiScreenshots
@@ -156,8 +156,8 @@ func TestWiFiScreenshots(t *testing.T) {
 		t.Skip("set PINKY_SCREENSHOTS to a folder to write the screenshots")
 	}
 	dark := os.Getenv("PINKY_SCREENSHOTS_DARK") != ""
-	for _, lang := range []string{"en", "zh-Hans"} {
-		short := map[string]string{"en": "en", "zh-Hans": "zh"}[lang]
+	for _, lang := range testLanguages() {
+		short := langShort(lang)
 		inLanguage(t, lang)
 		ta, id := foundApp(t, true)
 		shoot := func(name string, w, h int) {

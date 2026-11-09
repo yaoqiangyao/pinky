@@ -53,41 +53,61 @@ func args(msg string) []string {
 	return out
 }
 
-// TestTranslations checks that every English message has a Simplified
-// Chinese one with the same arguments, and that the translation has no key
-// English lacks.
+// TestTranslations checks that every English message has a translation
+// in each other catalog with the same arguments, and that no catalog
+// has a key English lacks.
 func TestTranslations(t *testing.T) {
-	en, zh := catalog(t, "en.json"), catalog(t, "zh-Hans.json")
-	for k, msg := range en {
-		tr, ok := zh[k]
-		if !ok {
-			t.Errorf("zh-Hans.json lacks %q (%q)", k, msg)
+	en := catalog(t, "en.json")
+	ents, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range ents {
+		name := e.Name()
+		if !strings.HasSuffix(name, ".json") || name == "en.json" {
 			continue
 		}
-		if a, b := args(msg), args(tr); !reflect.DeepEqual(a, b) {
-			t.Errorf("%s: English has the arguments %v, Chinese %v", k, a, b)
+		tr := catalog(t, name)
+		for k, msg := range en {
+			got, ok := tr[k]
+			if !ok {
+				t.Errorf("%s lacks %q (%q)", name, k, msg)
+				continue
+			}
+			if a, b := args(msg), args(got); !reflect.DeepEqual(a, b) {
+				t.Errorf("%s %s: English has the arguments %v, translation %v", name, k, a, b)
+			}
+			if strings.TrimSpace(got) == "" {
+				t.Errorf("%s %s: empty translation", name, k)
+			}
 		}
-		if strings.TrimSpace(tr) == "" {
-			t.Errorf("%s: empty translation", k)
-		}
-	}
-	for k := range zh {
-		if _, ok := en[k]; !ok {
-			t.Errorf("zh-Hans.json has %q, which en.json lacks", k)
+		for k := range tr {
+			if _, ok := en[k]; !ok {
+				t.Errorf("%s has %q, which en.json lacks", name, k)
+			}
 		}
 	}
 }
 
 // TestLanguageMatch checks which catalog a language reads: Chinese written
-// in simplified characters reads Chinese, other languages English.
+// in simplified characters reads Chinese, Japanese reads Japanese, other
+// languages English.
 func TestLanguageMatch(t *testing.T) {
-	zh, en := In("zh-Hans").SidebarStopAll(), In("en").SidebarStopAll()
+	zh, ja, en := In("zh-Hans").SidebarStopAll(), In("ja").SidebarStopAll(), In("en").SidebarStopAll()
 	if zh == en {
 		t.Fatalf("the Chinese catalog says %q as English does", zh)
+	}
+	if ja == en {
+		t.Fatalf("the Japanese catalog says %q as English does", ja)
 	}
 	for _, tag := range []string{"zh-CN", "zh-Hans-SG", "zh"} {
 		if got := In(tag).SidebarStopAll(); got != zh {
 			t.Errorf("%s says %q, want the Chinese %q", tag, got, zh)
+		}
+	}
+	for _, tag := range []string{"ja", "ja-JP"} {
+		if got := In(tag).SidebarStopAll(); got != ja {
+			t.Errorf("%s says %q, want the Japanese %q", tag, got, ja)
 		}
 	}
 	for _, tag := range []string{"en-GB", "de", "zh-Hant"} {

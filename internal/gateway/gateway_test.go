@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -589,6 +590,52 @@ func TestOfflineAndReconnect(t *testing.T) {
 	dev.SetOffline(false)
 	waitUntil(t, "the phone to come back", func() bool { return g.Devices()[0].Status != DeviceOffline })
 	mustStatus(t, s.Observe(context.Background(), ObserveRequest{}), StatusSettled)
+}
+
+// slowOpen is a provider whose Open takes long once armed, as an iPhone
+// over Wi-Fi or a slow Windows runner does.
+type slowOpen struct {
+	driver.Provider
+	mu    sync.Mutex
+	delay time.Duration
+}
+
+func (p *slowOpen) Open(ctx context.Context, id string) (driver.Device, error) {
+	p.mu.Lock()
+	d := p.delay
+	p.mu.Unlock()
+	select {
+	case <-time.After(d):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return p.Provider.Open(ctx, id)
+}
+
+// TestCallsWaitWhileConnecting: a phone that dropped is back and Pinky is
+// opening it (Connecting): an agent's call waits for the open instead of
+// getting device_offline.
+func TestCallsWaitWhileConnecting(t *testing.T) {
+	dev := demo.NewDevice("pixel", "Pixel 9", driver.Android)
+	p := &slowOpen{Provider: demo.NewProvider(driver.Android, dev)}
+	g, _ := newTestGateway(t, func(o *Options) {
+		o.Providers = []driver.Provider{p}
+		o.ReconnectGrace = time.Minute
+	})
+	s, _ := connect(t, g, "Lunch")
+	dev.SetOffline(true)
+	waitUntil(t, "the phone to drop", func() bool { return g.Devices()[0].Status == DeviceOffline })
+	p.mu.Lock()
+	p.delay = 400 * time.Millisecond
+	p.mu.Unlock()
+	dev.SetOffline(false)
+	waitUntil(t, "Pinky to open it", func() bool { return g.Devices()[0].Status == DeviceConnecting })
+	start := time.Now()
+	mustStatus(t, s.Observe(context.Background(), ObserveRequest{}), StatusSettled)
+	if st := g.Devices()[0].Status; st == DeviceOffline || st == DeviceConnecting {
+		t.Fatalf("status %q after the read", st)
+	}
+	t.Logf("the read waited %v for the open", time.Since(start).Round(time.Millisecond))
 }
 
 // TestOfflinePastGrace ends the lease of a phone that stays away past the

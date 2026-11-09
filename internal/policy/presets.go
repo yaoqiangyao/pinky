@@ -136,15 +136,16 @@ func (e *Engine) SetPreset(p Preset) error {
 	return e.saveRulesLocked()
 }
 
-// HideCodes reports whether digit codes in notifications are masked.
+// HideCodes reports whether one-time codes are masked, on the screen and in
+// events (codes.go).
 func (e *Engine) HideCodes() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.file.MaskCodes == nil || *e.file.MaskCodes
 }
 
-// SetHideCodes turns masking of digit codes in notifications on or off and
-// saves the rules file.
+// SetHideCodes turns masking of one-time codes on or off and saves the
+// rules file.
 func (e *Engine) SetHideCodes(on bool) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()

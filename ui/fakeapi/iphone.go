@@ -134,8 +134,9 @@ var fakeMirror = driver.DiskImageMirror{Name: "github.com/doronz88/DeveloperDisk
 func (a *API) DiskImageMirror() (driver.DiskImageMirror, bool) { return fakeMirror, true }
 
 // DownloadDiskImage pretends to download the developer disk image in a
-// couple of seconds at Speed, then moves iPhones that waited for an image
-// on to being prepared; it fails with what SetDownloadError set.
+// couple of seconds at Speed, then moves iPhones that waited for an image,
+// or whose image Apple refused, on to being prepared; it fails with what
+// SetDownloadError set.
 func (a *API) DownloadDiskImage(ctx context.Context, progress func(done, total int64)) error {
 	const steps = 8
 	for i := 1; i <= steps; i++ {
@@ -157,7 +158,7 @@ func (a *API) DownloadDiskImage(ctx context.Context, progress func(done, total i
 	a.mu.Lock()
 	var waiting []string
 	for _, d := range a.devices {
-		if d.info.Platform == driver.IOS && d.info.Setup == driver.SetupNoDiskImage {
+		if d.info.Platform == driver.IOS && (d.info.Setup == driver.SetupNoDiskImage || d.info.Setup == driver.SetupDiskImageRefused) {
 			waiting = append(waiting, d.info.ID)
 		}
 	}

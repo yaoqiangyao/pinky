@@ -26,9 +26,11 @@ import (
 // becomes an event, once per appearance: an alert a dialog event, whose
 // buttons are also listed so that an agent can press them; anything else
 // with a button a notification event (a banner opens its app when tapped);
-// the rest a toast event. Notifications are never listed as elements: the
-// gateway masks codes in events only. The app's elements under an overlay
-// are left out, as under the tab bar.
+// the rest a toast event. A notification is also listed as one element
+// while it shows, with its place and the app that posted it in its ID
+// (screen.NotificationID), so that the gateway can hide a blocked app's
+// banner and cover it in screenshots, and mask a code in it there too. The
+// app's elements under an overlay are left out, as under the tab bar.
 
 // traitStatusBar marks the status bar's items in SpringBoard's tree (the
 // time, signal, Wi-Fi, battery, location, the breadcrumb back to an app).
@@ -72,6 +74,9 @@ type springBoardWatch struct {
 	running  chan struct{} // closed when the probe in flight ends
 	last     *sbProbe
 	shown    map[[2]uint64]bool // overlays already reported
+	// posted is the bundle id of the app that posted each notification
+	// overlay still shown ("" when not found), found when it came.
+	posted map[[2]uint64]string
 }
 
 // kickSpringBoard starts a look at SpringBoard's overlays, unless one is
@@ -294,8 +299,9 @@ func overlayRect(o sbOverlay, scale float64, w, h int) screen.Rect {
 
 // overlayEvents turns what SpringBoard shows into events, each overlay
 // once while it stays, and returns the overlays' places, to leave out the
-// app's elements under them, and the dialogs' elements, to list.
-func (d *Device) overlayEvents(ctx context.Context, over []sbOverlay, scale float64, w, h int) (evs []screen.Event, covered []screen.Rect, dialog []raxElement) {
+// app's elements under them, the dialogs' elements, to list, and an
+// element for each notification shown (notificationElement).
+func (d *Device) overlayEvents(ctx context.Context, over []sbOverlay, scale float64, w, h int) (evs []screen.Event, covered []screen.Rect, dialog []raxElement, notes []screen.Element) {
 	sw := &d.sb
 	sw.mu.Lock()
 	now := map[[2]uint64]bool{}
@@ -307,19 +313,13 @@ func (d *Device) overlayEvents(ctx context.Context, over []sbOverlay, scale floa
 		}
 	}
 	sw.shown = now
-	sw.mu.Unlock()
-	for _, o := range over {
-		kind := overlayKind(o.els)
-		if kind == screen.EventToast {
-			continue // a status banner, gone in a moment
-		}
-		if r := overlayRect(o, scale, w, h); !r.Empty() {
-			covered = append(covered, r)
-		}
-		if kind == screen.EventDialog {
-			dialog = append(dialog, o.els...)
+	posted := map[[2]uint64]string{}
+	for k, app := range sw.posted {
+		if now[k] {
+			posted[k] = app
 		}
 	}
+	sw.mu.Unlock()
 	for _, o := range fresh {
 		kind := overlayKind(o.els)
 		text := overlayText(o.els)
@@ -329,10 +329,47 @@ func (d *Device) overlayEvents(ctx context.Context, over []sbOverlay, scale floa
 		ev := screen.Event{Kind: kind, Text: text}
 		if kind == screen.EventNotification {
 			ev.App, ev.Text = d.postingApp(ctx, text)
+			posted[o.key] = ev.App
 		}
 		evs = append(evs, ev)
 	}
-	return evs, covered, dialog
+	sw.mu.Lock()
+	sw.posted = posted
+	sw.mu.Unlock()
+	for _, o := range over {
+		kind := overlayKind(o.els)
+		if kind == screen.EventToast {
+			continue // a status banner, gone in a moment
+		}
+		r := overlayRect(o, scale, w, h)
+		if !r.Empty() {
+			covered = append(covered, r)
+		}
+		switch kind {
+		case screen.EventDialog:
+			dialog = append(dialog, o.els...)
+		case screen.EventNotification:
+			if e, ok := notificationElement(o, r, posted[o.key]); ok {
+				notes = append(notes, e)
+			}
+		}
+	}
+	return evs, covered, dialog, notes
+}
+
+// notificationElement is the element that stands for a notification
+// SpringBoard shows over the app: its whole text, its app's name first, as
+// a button (a tap opens the app), at its place r; app is the bundle id of
+// the app that posted it, if known. A banner whose frames are another
+// process's has no place: the gateway then withholds a screenshot of a
+// blocked app's.
+func notificationElement(o sbOverlay, r screen.Rect, app string) (screen.Element, bool) {
+	text := overlayText(o.els)
+	if text == "" {
+		return screen.Element{}, false
+	}
+	return screen.Element{Role: screen.RoleButton, Label: text, Bounds: r, Source: screen.SourceTree,
+		Path: springBoard, ID: screen.NotificationID(app)}, true
 }
 
 // dialogElements turns the elements of SpringBoard's alerts into screen

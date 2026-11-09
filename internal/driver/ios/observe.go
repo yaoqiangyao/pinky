@@ -1,9 +1,12 @@
 package ios
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"sort"
 	"strings"
 	"sync"
@@ -158,7 +161,7 @@ func (d *Device) lockedScreen() *screen.Screen {
 	return &screen.Screen{
 		Width: si.Width, Height: si.Height,
 		App:         screen.App{Name: "Home Screen", ID: springBoard},
-		Orientation: orientationName(si.Orientation),
+		Orientation: orientationOf(si.Width, si.Height),
 		Locked:      true,
 		CapturedAt:  time.Now(),
 	}
@@ -172,7 +175,6 @@ var errEmptyRead = errors.New("the iPhone answered with an empty screen")
 func (d *Device) observeInspector(ctx context.Context, opt driver.ObserveOptions, st ObserveStats) (*screen.Screen, ObserveStats, error) {
 	start := time.Now()
 	st.Source = "inspector"
-	si := d.screen()
 	ax, err := d.axReady(ctx)
 	if err != nil {
 		return nil, st, err
@@ -191,6 +193,7 @@ func (d *Device) observeInspector(ctx context.Context, opt driver.ObserveOptions
 	}()
 	var lines []ocrLine
 	var ocrErr error
+	var shotW, shotH int // the picture OCR read, the right way up
 	var pictured sync.WaitGroup
 	// The picture places the elements and adds OCR's text; it waits until
 	// the read may take it (capturegate.go), here once the walk named the
@@ -200,12 +203,13 @@ func (d *Device) observeInspector(ctx context.Context, opt driver.ObserveOptions
 		go func() {
 			defer pictured.Done()
 			t := time.Now()
-			png, _, from, err := d.ocrPicture(ctx, opt)
+			png, pic, from, err := d.ocrPicture(ctx, opt)
 			st.Shot, st.ShotFrom = time.Since(t), from
 			if err != nil {
 				ocrErr = err
 				return
 			}
+			shotW, shotH = pictureSize(png, pic)
 			t = time.Now()
 			lines, ocrErr = recognizeText(png, ocrOptions{Languages: ocrLanguages})
 			st.OCR = time.Since(t)
@@ -217,7 +221,16 @@ func (d *Device) observeInspector(ctx context.Context, opt driver.ObserveOptions
 		defer wg.Done()
 		locked, _ = d.Locked(ctx)
 	}()
+	if d.hasDisplayInfo() {
+		// The display's orientation, read while the walk runs.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			d.readDisplayNow(ctx)
+		}()
+	}
 	wg.Wait()
+	si := d.screen()
 	appName, appID := ax.foreground()
 	if app, ok := d.appForPID(ctx, ownerPID(nodes)); ok {
 		appName, appID = app.Name, app.ID
@@ -225,7 +238,7 @@ func (d *Device) observeInspector(ctx context.Context, opt driver.ObserveOptions
 	s := &screen.Screen{
 		Width: si.Width, Height: si.Height,
 		App:         screen.App{Name: appName, ID: appID},
-		Orientation: orientationName(si.Orientation),
+		Orientation: orientationOf(si.Width, si.Height),
 		Locked:      locked,
 		CapturedAt:  time.Now(),
 	}
@@ -234,6 +247,15 @@ func (d *Device) observeInspector(ctx context.Context, opt driver.ObserveOptions
 	st.Capture, st.CaptureWait = gate.stats()
 	if !use {
 		lines, ocrErr = nil, nil
+	}
+	if !d.hasDisplayInfo() && shotW > 0 && shotH > 0 {
+		// Without display info (below iOS 27) the screenshot, which is
+		// always upright, gives the screen's size as it is now.
+		d.mu.Lock()
+		d.scr.Width, d.scr.Height = shotW, shotH
+		d.mu.Unlock()
+		si = d.screen()
+		s.Width, s.Height, s.Orientation = si.Width, si.Height, orientationOf(si.Width, si.Height)
 	}
 	if len(nodes) == 0 {
 		if ocrErr != nil || len(lines) == 0 {
@@ -389,15 +411,6 @@ func ownerPID(nodes []axNode) uint64 {
 		}
 	}
 	return best
-}
-
-func orientationName(rot string) string {
-	switch rot {
-	case "rot90", "rot270":
-		return "landscape"
-	default:
-		return "portrait"
-	}
 }
 
 // norm folds a string for matching: lower case, letters and digits only.
@@ -559,4 +572,16 @@ func shareOf(r screen.Rect, text, label string) screen.Rect {
 	r.X += r.W * off / len(t)
 	r.W = r.W * len(l) / len(t)
 	return r
+}
+
+// pictureSize is the size of the picture OCR read: the decoded one, else
+// the PNG's header.
+func pictureSize(b []byte, img image.Image) (int, int) {
+	if img != nil {
+		return img.Bounds().Dx(), img.Bounds().Dy()
+	}
+	if cfg, err := png.DecodeConfig(bytes.NewReader(b)); err == nil {
+		return cfg.Width, cfg.Height
+	}
+	return 0, 0
 }

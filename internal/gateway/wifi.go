@@ -198,20 +198,41 @@ func connectionOf(listed string, dev driver.Device) string {
 	return dev.Info().Connection
 }
 
+// connectWait is how long calls wait for a phone Pinky is opening: one
+// that dropped and is back, listed and shown as Connecting. An Android
+// phone opens in a second or two, an iPhone over Wi-Fi in a few. Before,
+// such calls got device_offline though the phone was back, which
+// TestOfflineAndReconnect ran into on Windows, where opening is slower.
+const connectWait = 20 * time.Second
+
+// backBy is until when calls wait for a phone that is offline: while it
+// moves between its cable and Wi-Fi, or while Pinky opens it. The caller
+// holds g.mu.
+func backBy(d *device) time.Time {
+	until := d.moving
+	if d.opening && d.info.State == driver.StateOnline {
+		if t := d.openingAt.Add(connectWait); t.After(until) {
+			until = t
+		}
+	}
+	return until
+}
+
 // expectedBack reports whether a phone that is offline is expected back in
-// a moment, as it moves between its cable and Wi-Fi.
+// a moment: it moves between its cable and Wi-Fi, or Pinky opens it.
 func (g *Gateway) expectedBack(d *device) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	return !d.online && time.Now().Before(d.moving)
+	return !d.online && time.Now().Before(backBy(d))
 }
 
-// waitMovingLocked waits, while a phone moves between its cable and Wi-Fi,
-// until it is back, the wait is over or ctx ends. It reports whether it
-// waited; the caller then looks at the phone again. The caller holds g.mu,
-// which is released while waiting and held again on return.
+// waitMovingLocked waits, while a phone moves between its cable and Wi-Fi
+// or Pinky opens it (backBy), until it is back, the wait is over, the open
+// failed or ctx ends. It reports whether it waited; the caller then looks
+// at the phone again. The caller holds g.mu, which is released while
+// waiting and held again on return.
 func (g *Gateway) waitMovingLocked(ctx context.Context, d *device) bool {
-	until := d.moving
+	until := backBy(d)
 	if d.online || !time.Now().Before(until) {
 		return false
 	}

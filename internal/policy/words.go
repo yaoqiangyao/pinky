@@ -228,10 +228,52 @@ var codeWords = words(
 
 var codePhrases = []string{"one-time", "one time", "sign-in", "sign in"}
 
+// codeNouns are the codeWords that name a code outright.
+var codeNouns = words(
+	"code", "codes", "otp", "passcode", "2fa", "pin", "token", "código", "codigo", "codice", "bestätigungscode",
+	"sicherheitscode", "код", "пароль", "tan",
+)
+
 // cjkCodeKeywords are matched anywhere in CJK text.
 var cjkCodeKeywords = []string{
 	"验证码", "校验码", "动态码", "驗證碼", "認證碼", "確認碼", "确认码", "认证码", "コード", "認証", "인증",
 }
+
+// notCodePhrases name codes that are not one-time codes; their code words
+// do not count (hasCodeWords). Lower case.
+var notCodePhrases = []string{
+	"zip code", "zipcode", "postal code", "post code", "postcode", "area code", "country code", "promo code",
+	"promotional code", "coupon code", "discount code", "gift code", "gift card code", "referral code",
+	"invite code", "invitation code", "voucher code", "redeem code", "redemption code", "source code", "qr code",
+	"bar code", "barcode", "error code", "status code", "color code", "colour code", "dress code",
+	"código postal", "código promocional", "código de descuento", "codice postale", "codice sconto",
+	"codice promozionale", "gutscheincode", "rabattcode", "クーポンコード", "招待コード", "プロモーションコード",
+	"ギフトコード", "qrコード", "バーコード", "エラーコード",
+}
+
+// currencySigns before a number, and currencyWords before or after it,
+// make it an amount, not a code.
+const currencySigns = "$€£¥₩₹₽₫฿₺₴₱￥＄"
+
+var currencyWords = words(
+	"usd", "rmb", "cny", "eur", "gbp", "jpy", "hkd", "twd", "krw", "inr", "rs", "sgd", "aud", "cad",
+	"chf", "myr", "thb", "rub", "brl", "mxn", "idr", "php", "vnd", "yuan", "dollar", "dollars", "euro",
+	"euros", "pound", "pounds", "yen", "won", "rupee", "rupees",
+)
+
+// unitRunes and unitWords after a number make it an amount, a date or a
+// measure, not a code.
+const unitRunes = "元块圆円원年月日号%‰€₽₫°"
+
+var unitWords = words(
+	"km", "kg", "mb", "gb", "kb", "tb", "mah", "ml", "mm", "cm", "kcal", "cal", "mi", "ft", "points", "pts", "steps",
+)
+
+// monthWords before a year make it a date.
+var monthWords = words(
+	"january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+	"november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+)
 
 func words(ws ...string) map[string]bool {
 	m := make(map[string]bool, len(ws))

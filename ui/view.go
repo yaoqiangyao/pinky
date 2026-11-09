@@ -61,12 +61,20 @@ func (a *app) view(c *mg.Context) {
 	}
 }
 
+// sidebarWidth is the width of the sidebar, and rightPanelWidth that of
+// the Needs you and Tasks panel on the right of the Phone screen: the
+// room between them is the phone's, or All phones'.
+const (
+	sidebarWidth    = 220
+	rightPanelWidth = 320
+)
+
 // sidebar is the prototype's nav: the logo, the phones, Add phone, and
 // Activity, Settings and Stop all at the bottom.
 func (a *app) sidebar(c *mg.Context) {
 	p := pal(c)
 	bar := c.TitleBar()
-	mg.Column(c).Width(220).Shrink(0).Background(p.bg2).BorderWidth(0, 1, 0, 0).BorderColor(p.line).
+	mg.Column(c).Width(sidebarWidth).Shrink(0).Background(p.bg2).BorderWidth(0, 1, 0, 0).BorderColor(p.line).
 		Padding(0, 8, 12, 8).Gap(2).Children(func() {
 		// The header: the window controls, then the brand.
 		left := float32(6)
@@ -78,39 +86,7 @@ func (a *app) sidebar(c *mg.Context) {
 			mg.Text(c, "Pinky").FontSize(14).FontWeight(650).TextColor(p.ink)
 		})
 		mg.Text(c, locales.SidebarPhones()).FontSize(12).FontWeight(600).TextColor(p.ink3).Padding(4, 10, 6, 10)
-		phones := a.page == pagePhones
-		if len(a.devices) >= 2 {
-			on := phones && a.sel == allPhones
-			row := phoneRow(c, on)
-			if row.Clicked() {
-				a.selectPhone(allPhones)
-			}
-			row.Label(locales.SidebarAllPhones()).Children(func() {
-				mg.Icon(c, icGrid).FontSize(16).TextColor(p.ink2)
-				mg.Text(c, locales.SidebarAllPhones()).FontSize(14).FontWeight(600)
-			})
-		}
-		for _, d := range a.devices {
-			d := d
-			on := phones && a.sel == d.Info.ID
-			row := phoneRow(c.Key(d.Info.ID), on)
-			if row.Clicked() {
-				a.selectPhone(d.Info.ID)
-			}
-			if a.canRemove() {
-				row.ContextMenu(func(m *mg.Menu) { a.removeMenuItem(m, d) })
-			}
-			row.Label(locales.SidebarPhoneRow(d.Info.Name, statusLine(d))).Children(func() {
-				statusDot(c, d)
-				mg.Column(c).Grow(1).MinWidth(0).Children(func() {
-					name := mg.Text(c, d.Info.Name).FontSize(14).FontWeight(600).SingleLine()
-					if d.Status == gateway.DeviceOffline {
-						name.TextColor(p.ink2)
-					}
-					mg.Text(c, statusLine(d)).FontSize(12).TextColor(p.ink2).SingleLine()
-				})
-			})
-		}
+		a.sidebarPhones(c)
 		add := phoneRow(c, a.page == pageAddPhone).MinHeight(36).TextColor(p.ink2)
 		if add.Clicked() {
 			a.page = pageAddPhone
@@ -142,6 +118,66 @@ func (a *app) sidebar(c *mg.Context) {
 				mg.Text(c, shortcutLabel()).FontSize(12.5).TextColor(p.red).Opacity(0.8)
 			})
 		})
+	})
+}
+
+// sidebarPhones are the sidebar's rows of phones, after All phones when
+// there are two or more. They scroll when there are more than the window
+// shows, between the brand and Add phone, which stay in view with
+// Activity, Settings and Stop all. The selected phone's row comes into
+// view when the selection changes, as by a tile of All phones.
+func (a *app) sidebarPhones(c *mg.Context) {
+	p := pal(c)
+	phones := a.page == pagePhones
+	reveal := func(row mg.Element, id string) {
+		if a.selShown != id {
+			a.selShown = id
+			row.ScrollIntoView()
+		}
+	}
+	// The margins and padding leave room for the rows' focus rings, which
+	// the view would clip, without moving the rows.
+	ring := float32(3)
+	list := mg.Scroll(c).MinHeight(0).Margin(-ring, -8).Padding(ring, 8).Gap(2).Label(locales.SidebarPhones())
+	list.Children(func() {
+		if len(a.devices) >= 2 {
+			on := phones && a.sel == allPhones
+			row := phoneRow(c, on)
+			if row.Clicked() {
+				a.selectPhone(allPhones)
+			}
+			if on {
+				reveal(row, allPhones)
+			}
+			row.Label(locales.SidebarAllPhones()).Children(func() {
+				mg.Icon(c, icGrid).FontSize(16).TextColor(p.ink2)
+				mg.Text(c, locales.SidebarAllPhones()).FontSize(14).FontWeight(600)
+			})
+		}
+		for _, d := range a.devices {
+			d := d
+			on := phones && a.sel == d.Info.ID
+			row := phoneRow(c.Key(d.Info.ID), on)
+			if row.Clicked() {
+				a.selectPhone(d.Info.ID)
+			}
+			if on {
+				reveal(row, d.Info.ID)
+			}
+			if a.canRemove() {
+				row.ContextMenu(func(m *mg.Menu) { a.removeMenuItem(m, d) })
+			}
+			row.Label(locales.SidebarPhoneRow(d.Info.Name, statusLine(d))).Children(func() {
+				statusDot(c, d)
+				mg.Column(c).Grow(1).MinWidth(0).Children(func() {
+					name := mg.Text(c, d.Info.Name).FontSize(14).FontWeight(600).SingleLine()
+					if d.Status == gateway.DeviceOffline {
+						name.TextColor(p.ink2)
+					}
+					mg.Text(c, statusLine(d)).FontSize(12).TextColor(p.ink2).SingleLine()
+				})
+			})
+		}
 	})
 }
 

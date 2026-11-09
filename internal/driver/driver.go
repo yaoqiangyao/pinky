@@ -64,7 +64,35 @@ type Info struct {
 	// DiskImage is the developer disk image a phone waiting with
 	// SetupDiskImageRefused was refused; nil otherwise.
 	DiskImage *DiskImage `json:",omitempty"`
+	// WiFi is what the provider knows of reaching an iPhone or iPad over
+	// Wi-Fi, for its checkup and diagnostics; zero for other phones.
+	WiFi WiFiConnection `json:",omitzero"`
 }
+
+// WiFiConnection is what an iPhone's provider knows of its Wi-Fi connection:
+// whether the phone allows this computer to reach it over Wi-Fi (Finder's
+// "Show this iPhone when on Wi-Fi", Xcode's "Connect via network", the
+// lockdown value EnableWifiConnections), who turned that on, and whether
+// this computer lists it over the network now.
+type WiFiConnection struct {
+	// Connections is one of the WiFiConnections values; "" when the driver
+	// does not tell.
+	Connections string
+	// Detail says, in English, why turning them on failed or why Pinky did
+	// not look.
+	Detail string `json:",omitempty"`
+	// Seen: this computer lists the phone over the network now.
+	Seen bool `json:",omitempty"`
+}
+
+// WiFiConnection.Connections values.
+const (
+	WiFiConnectionsOn       = "on"        // they are on: listed over the network, or read so on a cable
+	WiFiConnectionsTurnedOn = "turned_on" // Pinky turned them on when the phone was plugged in
+	WiFiConnectionsFailed   = "failed"    // Pinky could not turn them on: Detail says why
+	WiFiConnectionsOff      = "off"       // Pinky does not use phones over Wi-Fi (Settings › Phones), so it did not look
+	WiFiConnectionsUnknown  = "unknown"   // not looked at: the phone does not trust this computer or did not answer (Detail), or was not plugged in since Pinky started
+)
 
 // DiskImage is a developer disk image on the computer (iPhones).
 type DiskImage struct {
@@ -115,6 +143,12 @@ const (
 	// no longer lists it, and will not for up to an hour. Restarting the
 	// service (DeviceServiceRestarter) brings it back.
 	SetupDeviceService = "device_service"
+	// SetupNotOnWiFi: an iPhone whose cable was just pulled, and whose
+	// Wi-Fi connection is on, is not seen on Wi-Fi: neither the device
+	// service lists it nor does the network show it (another network, one
+	// that keeps devices apart, a VPN, asleep). Listed offline: it is not
+	// connected, and no step on the computer brings it back.
+	SetupNotOnWiFi = "not_on_wifi"
 )
 
 // Provider discovers and opens the devices of one platform.
@@ -261,6 +295,12 @@ type Packet struct {
 	PTS      time.Duration
 	Config   bool // codec configuration (SPS/PPS/VPS)
 	KeyFrame bool
+	// Turn is how many quarter turns clockwise put the picture the right
+	// way up, 0 to 3. Most streams are upright and leave it 0; an iPhone or
+	// iPad on iOS 27 sends its display as the panel is mounted, whatever
+	// way the device is turned. Touches go back in the picture's own
+	// pixels, before the turn.
+	Turn int
 }
 
 // Stream is a live encoded video stream.
@@ -327,6 +367,22 @@ type FrameShooter interface {
 	ScreenshotFromFrame(ctx context.Context, frame func(context.Context) (image.Image, error)) (image.Image, bool)
 }
 
+// NotificationLister lists the notifications the phone holds now, with the
+// app that posted each. The notification shade shows many of them without
+// their app's name (a collapsed row on Android 12 and later), so the
+// gateway finds a blocked app's rows there by their text.
+type NotificationLister interface {
+	Notifications(ctx context.Context) ([]Notification, error)
+}
+
+// Notification is one notification the phone holds.
+type Notification struct {
+	App string // package name or bundle id of the app that posted it
+	// Texts are what it says: its title, text, big text, sub text and the
+	// like, each as the app set it.
+	Texts []string
+}
+
 // Clipboard reads and writes the phone's clipboard.
 type Clipboard interface {
 	SetClipboard(ctx context.Context, text string) error
@@ -367,8 +423,9 @@ type Unlocker interface {
 }
 
 // DiskImageDownloader is a Provider that can download the developer disk
-// image a computer without Xcode lacks (iPhones), from a third-party
-// mirror, when the person asks.
+// image a computer without Xcode lacks, or whose image Apple's signing
+// server refused (iPhones), from a third-party mirror, when the person
+// asks.
 type DiskImageDownloader interface {
 	// DiskImageMirror says where the download comes from.
 	DiskImageMirror() DiskImageMirror
@@ -893,6 +950,8 @@ const (
 	FixLocalNetwork     = "local_network"      // allow Pinky under Privacy & Security › Local Network
 	FixLocked           = "locked"             // unlock the phone, then check again
 	FixRestart          = "restart"            // restart the phone: a setting it has takes effect only then
+	FixSameNetwork      = "same_network"       // put the phone on the same Wi-Fi as this computer, one that lets devices reach each other
+	FixWiFiSetting      = "wifi_setting"       // turn on Use iPhones and iPads over Wi-Fi in Settings › Phones
 )
 
 // Setup steps of Android phones, in Info.Setup with the Setup constants:

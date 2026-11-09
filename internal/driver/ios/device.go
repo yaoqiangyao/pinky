@@ -29,8 +29,9 @@ type Device struct {
 	mu      sync.Mutex // guards the fields below
 	m       *media
 	hid     *hidSession
-	scr     screenInfo
-	inputAt time.Time // when input starts to work
+	scr     screenInfo // as the phone last described it (screen gives it upright)
+	scrAt   time.Time  // when scr was read
+	inputAt time.Time  // when input starts to work
 
 	lastInput atomic.Int64 // unix nanos of the last input or launch Pinky sent
 
@@ -88,6 +89,7 @@ func Open(ctx context.Context, info driver.Info) (*Device, error) {
 		return nil, err
 	}
 	go d.idleLoop()
+	go d.orientLoop()
 	// Connect the accessibility service now (the phone answers its first
 	// requests slowly while it builds the first tree it pushes), and the
 	// pasteboard service, whose handshake would otherwise slow the first
@@ -119,7 +121,7 @@ func (d *Device) start(ctx context.Context) error {
 		return err
 	}
 	d.info2 = svc
-	d.scr = scr
+	d.scr, d.scrAt = scr, time.Now()
 	if err := d.restartMedia(ctx); err != nil {
 		return err
 	}
@@ -181,6 +183,7 @@ func (d *Device) restartMedia(ctx context.Context) error {
 	}
 	d.m, d.hid = m, h
 	d.inputAt = m.started.Add(inputSettle)
+	m.setTurn(d.scr.turn())
 	d.mu.Unlock()
 	return nil
 }
@@ -308,16 +311,100 @@ type MediaStats struct {
 	DelayKnown bool
 }
 
+// screen returns the screen the right way up, as the phone last described
+// it: Pinky's coordinates (see screenInfo).
 func (d *Device) screen() screenInfo {
+	return d.display().upright()
+}
+
+// display returns the main display as the phone last described it, in the
+// display's own frame.
+func (d *Device) display() screenInfo {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.scr
 }
 
-// panel maps a screen pixel to the touch panel's 0..65535 range.
+// hasDisplayInfo reports whether the phone describes its display
+// (CoreDevice's display info, iOS 27); below iOS 27 Pinky knows the screen
+// from screenshots alone.
+func (d *Device) hasDisplayInfo() bool {
+	d.svcMu.Lock()
+	defer d.svcMu.Unlock()
+	return d.info2 != nil
+}
+
+// orientFresh is how long a read of the display's orientation is trusted:
+// the person may turn the device at any time, and a read costs one
+// request (about 12 ms over USB).
+const orientFresh = time.Second
+
+// readDisplayNow reads the main display again and keeps what it says: its
+// orientation above all, which the video's packets carry from then on.
+func (d *Device) readDisplayNow(ctx context.Context) (screenInfo, error) {
+	d.svcMu.Lock()
+	svc := d.info2
+	d.svcMu.Unlock()
+	if svc == nil {
+		return d.display(), fmt.Errorf("display info: %w", driver.ErrOffline)
+	}
+	si, err := readScreenInfo(ctx, svc)
+	if err != nil && isClosedErr(err) && ctx.Err() == nil {
+		// The phone closed the connection (it locked, or a long session
+		// went quiet); the failed request dropped it, so this dials again.
+		si, err = readScreenInfo(ctx, svc)
+	}
+	if err != nil {
+		return d.display(), err
+	}
+	d.noteDisplay(si)
+	return si, nil
+}
+
+// noteDisplay keeps a fresh description of the main display.
+func (d *Device) noteDisplay(si screenInfo) {
+	d.mu.Lock()
+	d.scr, d.scrAt = si, time.Now()
+	m := d.m
+	d.mu.Unlock()
+	if m != nil {
+		m.setTurn(si.turn())
+	}
+}
+
+// freshDisplay returns the main display, read again when the last read is
+// older than orientFresh. A failed read keeps the last one.
+func (d *Device) freshDisplay(ctx context.Context) screenInfo {
+	d.mu.Lock()
+	si, at := d.scr, d.scrAt
+	d.mu.Unlock()
+	if time.Since(at) < orientFresh {
+		return si
+	}
+	si, _ = d.readDisplayNow(ctx)
+	return si
+}
+
+// panel maps a screen pixel, the right way up, to the touch panel's
+// 0..65535 range, which is in the frame of the device held the usual way
+// up (see screenInfo).
 func (d *Device) panel(p screen.Point) (uint16, uint16) {
-	s := d.screen()
-	return scaleAxis(p.X, s.Width), scaleAxis(p.Y, s.Height)
+	return panelPoint(p, d.display())
+}
+
+// panelPoint maps a point of the upright screen si describes to the touch
+// panel.
+func panelPoint(p screen.Point, si screenInfo) (uint16, uint16) {
+	u := si.upright()
+	if u.Width <= 0 || u.Height <= 0 {
+		return 0, 0
+	}
+	p.X = max(0, min(p.X, u.Width-1))
+	p.Y = max(0, min(p.Y, u.Height-1))
+	back := si.touchTurn().inverse()
+	t := turnPoint(p, u.Width, u.Height, back)
+	tw, th := turnSize(u.Width, u.Height, back)
+	return scaleAxis(t.X, tw), scaleAxis(t.Y, th)
 }
 
 func scaleAxis(v, size int) uint16 {
@@ -430,7 +517,10 @@ func (d *Device) gestureHook(ctx context.Context, path []screen.Point, gap time.
 	if err := h.liftHeld(); err != nil {
 		return err
 	}
-	x, y := d.panel(path[0])
+	// The whole gesture maps through one description of the screen, read
+	// fresh: the person may have turned the device since the last one.
+	si := d.freshDisplay(ctx)
+	x, y := panelPoint(path[0], si)
 	if err := h.touchAt(true, x, y); err != nil {
 		return err
 	}
@@ -445,7 +535,7 @@ func (d *Device) gestureHook(ctx context.Context, path []screen.Point, gap time.
 		if gerr = sleepCtx(ctx, gap); gerr != nil {
 			break
 		}
-		x, y = d.panel(p)
+		x, y = panelPoint(p, si)
 		if gerr = h.touchAt(true, x, y); gerr != nil {
 			break
 		}
@@ -468,12 +558,14 @@ func (d *Device) videoSize() (int, int) {
 	return m.size()
 }
 
-// fromVideo converts a point in the stream's picture to screen pixels. The
-// phone puts its screen at 1:1 in the picture's top-left corner and pads the
-// rest with black: 1125x2436 inside 1136x2464 on the 13 mini, measured by
-// matching decoded frames against screenshots. So a point keeps its
-// coordinates, and one in the padding ends up on the screen's edge (panel
-// clamps it). A picture smaller than the screen would mean the phone scaled
+// fromVideo converts a point in the stream's picture to the display's
+// pixels, in the display's own frame (the video is in it, whatever way the
+// device is turned; see screenInfo). The phone puts its screen at 1:1 in
+// the picture's top-left corner and pads the rest with black: 1125x2436
+// inside 1136x2464 on the 13 mini, 2388x1668 inside 2400x1680 on an iPad
+// Pro, measured by matching decoded frames against screenshots. So a point
+// keeps its coordinates, and one in the padding ends up on the screen's edge
+// (panel clamps it). A picture smaller than the screen would mean the phone scaled
 // its screen down to fit, which no tested phone did; the point is then
 // scaled back up, assuming a uniform fit in the top-left corner.
 func fromVideo(p screen.Point, vw, vh, sw, sh int) screen.Point {
@@ -485,7 +577,9 @@ func fromVideo(p screen.Point, vw, vh, sw, sh int) screen.Point {
 }
 
 // Touch implements driver.Toucher: raw touches for the person's drags on
-// the mirror, at points in the stream's picture (see fromVideo). A move
+// the mirror, at points in the stream's picture as the phone sends it, in
+// the display's own frame (see fromVideo); the mirror turns the picture
+// upright for the person (driver.Packet.Turn) and its points back. A move
 // without a down is ignored.
 func (d *Device) Touch(ctx context.Context, a driver.TouchAction, p screen.Point) error {
 	d.inputMu.Lock()
@@ -494,9 +588,14 @@ func (d *Device) Touch(ctx context.Context, a driver.TouchAction, p screen.Point
 	if err != nil {
 		return err
 	}
-	s := d.screen()
+	s := d.display()
 	vw, vh := d.videoSize()
-	x, y := d.panel(fromVideo(p, vw, vh, s.Width, s.Height))
+	native := fromVideo(p, vw, vh, s.Width, s.Height)
+	native.X = max(0, min(native.X, s.Width-1))
+	native.Y = max(0, min(native.Y, s.Height-1))
+	// The display's frame turned by the interface's turn is the upright
+	// screen panelPoint takes.
+	x, y := panelPoint(turnPoint(native, s.Width, s.Height, s.turn()), s)
 	switch a {
 	case driver.TouchDown:
 		return h.touchAt(true, x, y)

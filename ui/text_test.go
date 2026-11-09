@@ -55,7 +55,7 @@ func TestHandoffBannerWithChineseReason(t *testing.T) {
 			ta.needs[i].Title = reason
 		}
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		tt := mg.NewTester(ta.view, 1280, 820)
 		inLanguage(t, lang, tt)
 		tt.Frame()

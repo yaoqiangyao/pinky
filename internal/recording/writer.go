@@ -34,6 +34,8 @@ type Writer struct {
 	w, h    int
 	err     error
 	closed  bool
+	turn    int          // the newest sample's turn (driver.Packet.Turn)
+	turns   []turnChange // turns since the last fragment, for its turn box
 }
 
 type sample struct {
@@ -117,10 +119,11 @@ func (w *Writer) Write(p driver.Packet, at time.Duration) error {
 		if !p.KeyFrame || w.params.empty() {
 			return nil // nothing can be decoded before the first key frame
 		}
-		if err := w.start(); err != nil {
+		if err := w.start(p.Turn & 3); err != nil {
 			return w.fail(err)
 		}
 		w.inband = nil
+		w.turn = p.Turn & 3
 	}
 	if p.KeyFrame && len(w.inband) > 0 {
 		nals = append(append([][]byte(nil), w.inband...), nals...)
@@ -142,6 +145,10 @@ func (w *Writer) Write(p driver.Packet, at time.Duration) error {
 			}
 		}
 	}
+	if turn := p.Turn & 3; turn != w.turn {
+		w.turns = append(w.turns, turnChange{t: s.t, turn: turn})
+		w.turn = turn
+	}
 	w.last = s.t
 	w.pending = append(w.pending, s)
 	return nil
@@ -159,8 +166,9 @@ func (w *Writer) setParams(ps paramSets) {
 	w.params = ps
 }
 
-// start creates the file and writes the init segment.
-func (w *Writer) start() error {
+// start creates the file and writes the init segment, whose track turns
+// the first picture turn quarter turns clockwise (turn.go).
+func (w *Writer) start(turn int) error {
 	init := mp4.NewMP4Init()
 	init.AddChild(mp4.NewFtyp("iso6", 0, []string{"iso6", "isom", "mp41"}))
 	moov := mp4.NewMoovBox()
@@ -178,6 +186,7 @@ func (w *Writer) start() error {
 		return fmt.Errorf("recording: parameter sets: %w", err)
 	}
 	w.w, w.h = int(trak.Tkhd.Width>>16), int(trak.Tkhd.Height>>16)
+	trak.Tkhd.Matrix = turnMatrix(turn, w.w, w.h)
 	f, err := os.OpenFile(w.path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
@@ -195,6 +204,12 @@ func (w *Writer) start() error {
 func (w *Writer) flush() error {
 	if len(w.pending) == 0 {
 		return nil
+	}
+	if len(w.turns) > 0 {
+		if err := writeTurnBox(w.f, w.turns); err != nil {
+			return err
+		}
+		w.turns = w.turns[:0]
 	}
 	w.seq++
 	frag, err := mp4.CreateFragment(w.seq, 1)

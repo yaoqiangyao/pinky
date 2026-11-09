@@ -76,14 +76,16 @@ type heldPhone struct {
 const lockdownTimeout = 8 * time.Second
 
 // SetWiFi implements driver.WiFiFinder. A phone that was open over Wi-Fi is
-// no longer listed once it is off, so the gateway closes it.
+// no longer listed once it is off, so the gateway closes it. On Linux it
+// also starts or stops the search for phones on Wi-Fi (netmux.go).
 func (p *Provider) SetWiFi(on bool) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if p.wifi.on != on {
 		p.logger().Info("iphone: using phones over Wi-Fi", "on", on)
 	}
 	p.wifi.on = on
+	p.mu.Unlock()
+	p.wifiMux(on)
 }
 
 // wifiOn reports whether Pinky uses phones over Wi-Fi.

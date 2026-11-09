@@ -101,3 +101,31 @@ func TestUnblockOneAppOfAPrefix(t *testing.T) {
 		t.Fatal("blocking it again did not")
 	}
 }
+
+// Chinese banks' credit card apps, whose names say no 银行, are blocked by
+// default: by their Android packages, their iOS bundle ids and their names.
+func TestChineseCardApps(t *testing.T) {
+	e := Default()
+	apps := []screen.App{
+		{ID: "com.bankcomm.maidanba"}, {ID: "com.cs_credit_bank"}, {ID: "com.cgb.creditcard.iphone"},
+		{ID: "com.citiccard.mobilebank"}, {ID: "com.citicbank.creditspace"},
+		{ID: "com.cmbchina.ccd.pluto.cmbActivity"}, {ID: "com.cmbchina.cmblife"},
+		{ID: "com.spdbccc.app"}, {ID: "spdbccc.com.cn"}, {ID: "com.cmbc.cc.mbank"}, {ID: "com.cmbc.mobilePhone"},
+		{ID: "com.ebank.creditcard"}, {ID: "com.cebbank.xyk"}, {ID: "com.cib.xyk"}, {ID: "com.HuaXiaBank.HuaCard"},
+		{ID: "com.ccb.longjiLife"}, {ID: "com.icbc.elife"}, {ID: "com.yitong.mbank.psbc.creditcard"}, {ID: "com.psbc.creditcard"},
+		{ID: "cn.com.spdb.mobilebank.per"}, {ID: "com.ccb.ccbDemo"}, {ID: "com.boc.BOCMBCI"},
+		{Name: "买单吧"}, {Name: "发现精彩"}, {Name: "动卡空间"}, {Name: "掌上生活"}, {Name: "浦大喜奔"}, {Name: "全民生活"},
+		{Name: "阳光惠生活"}, {Name: "兴业生活"}, {Name: "华彩生活"}, {Name: "建行生活"}, {Name: "工银e生活"},
+		{Name: "邮储信用卡"}, {Name: "广银信用卡"},
+	}
+	for _, a := range apps {
+		if rule, ok := e.Blocked(a); !ok || rule != "Finance apps" {
+			t.Errorf("%+v: blocked %v by %q", a, ok, rule)
+		}
+	}
+	for _, a := range []screen.App{{Name: "生活"}, {Name: "美团"}, {ID: "com.cs_credit_bank.other"}} {
+		if rule, ok := e.Blocked(a); ok {
+			t.Errorf("%+v is blocked by %q", a, rule)
+		}
+	}
+}

@@ -88,10 +88,10 @@ func nearPoint(p screen.Point, x, y int) bool {
 // banners sit above the phone, which shrinks to leave them room, and every
 // part of its screen takes a click: the top included, which the banner
 // used to cover (its top 7% in the window's default size, more in the
-// smallest), where apps put their back buttons and menus. In English and
-// Chinese, in the default, smallest, a tall and a wide window.
+// smallest), where apps put their back buttons and menus. In each of the
+// client's languages, in the default, smallest, a tall and a wide window.
 func TestControlBannerAboveTheScreen(t *testing.T) {
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		for _, sc := range []fakeapi.Scenario{fakeapi.Takeover, fakeapi.Handoff} {
 			for _, size := range [][2]int{{1280, 820}, {960, 620}, {1100, 1300}, {1900, 820}} {
 				t.Run(fmt.Sprintf("%s/%s/%dx%d", lang, sc, size[0], size[1]), func(t *testing.T) {
@@ -181,7 +181,7 @@ func TestControlBannerHeight(t *testing.T) {
 	if !ok || line.H == 0 {
 		t.Fatal("no line to measure")
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		for _, reason := range []string{"Sign in to Dinely, please", long} {
 			inLanguage(t, lang)
 			ta := newTestAppTimeout(t, fakeapi.Handoff, 10*time.Minute)
@@ -378,11 +378,11 @@ func fakePinPad(t *testing.T, w, h int, scale float32, zh bool) image.Image {
 
 // TestControlBannerScreenshots draws the banner above the mirror and the
 // lock giving way under the pointer into $PINKY_SCREENSHOTS, in light and
-// dark, English and Chinese: mirror-bar-<lang>-<theme>.png has the Phone
-// screen's middle in four states side by side (in control; a handoff's
-// "Your turn"; locked; locked with the pointer on the mirror), and
-// takeover-<theme>.png the whole window in control, in English. The
-// mirrors show pages drawn in the test.
+// dark, in each of the client's languages: mirror-bar-<lang>-<theme>.png has
+// the Phone screen's middle in four states side by side (in control; a
+// handoff's "Your turn"; locked; locked with the pointer on the mirror), and
+// takeover-<theme>.png the whole window in control, in English. The mirrors
+// show pages drawn in the test.
 func TestControlBannerScreenshots(t *testing.T) {
 	dir := os.Getenv("PINKY_SCREENSHOTS")
 	if dir == "" {
@@ -408,9 +408,9 @@ func TestControlBannerScreenshots(t *testing.T) {
 		}
 		return "light"
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		inLanguage(t, lang)
-		zh := lang != "en"
+		zh := lang == "zh-Hans"
 		checkout, _ := fakeCheckout(t, 360, 800, 3, zh)
 		pinPad := fakePinPad(t, 360, 800, 3, zh)
 		// render draws the window with the phone showing img; hover puts
@@ -471,7 +471,7 @@ func TestControlBannerScreenshots(t *testing.T) {
 				at := image.Pt(i*(crop.Dx()+gap), 0)
 				draw.Draw(out, crop.Sub(crop.Min).Add(at), s, crop.Min, draw.Src)
 			}
-			short := map[string]string{"en": "en", "zh-Hans": "zh"}[lang]
+			short := langShort(lang)
 			write("mirror-bar-"+short+"-"+theme(dark)+".png", out)
 		}
 	}

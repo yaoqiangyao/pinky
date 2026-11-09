@@ -88,7 +88,7 @@ func TestIPhoneHelperReminderLayout(t *testing.T) {
 	ta.sync()
 	d := ta.iphoneView(t)
 	ta.selectPhone(id)
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		for _, size := range [][2]int{{1280, 820}, {900, 600}} {
 			tt := mg.NewTester(ta.view, size[0], size[1])
 			inLanguage(t, lang, tt)
@@ -216,7 +216,7 @@ func TestIPhoneHelperRanOut(t *testing.T) {
 
 // TestIPhoneHelperScreenshots draws an iPhone's page with the reminder,
 // its checkup, and its page once the helper ran out, into
-// $PINKY_SCREENSHOTS, in English and Chinese:
+// $PINKY_SCREENSHOTS, in each of the client's languages:
 //
 //	PINKY_SCREENSHOTS=dir go test ./ui -run TestIPhoneHelperScreenshots
 func TestIPhoneHelperScreenshots(t *testing.T) {
@@ -248,7 +248,7 @@ func TestIPhoneHelperScreenshots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		inLanguage(t, lang)
 		ta.api.SetIPhone(id, driver.Info{State: driver.StateOnline, HelperExpires: exp})
 		ta.api.SetCheckup(id, driver.Checkup{System: "iOS 18.6", Checks: []driver.Check{

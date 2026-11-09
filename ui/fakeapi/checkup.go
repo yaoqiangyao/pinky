@@ -34,6 +34,9 @@ func (a *API) Checkup(ctx context.Context, deviceID string) (gateway.CheckupView
 	case <-time.After(time.Duration(float64(checkupDelay) / a.opt.Speed)):
 	}
 	v := gateway.CheckupView{DeviceID: info.ID, Platform: info.Platform, At: a.opt.Now(), Checks: gateway.ConnectionChecks(info)}
+	if c, ok := gateway.WiFiCheck(info); ok {
+		v.Checks = append(v.Checks, c)
+	}
 	if info.State != driver.StateOnline {
 		return v, nil
 	}

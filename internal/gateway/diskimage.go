@@ -12,7 +12,8 @@ import (
 var ErrNoDiskImageDownload = errors.New("no connected platform can download a developer disk image")
 
 // DiskImageMirror says where Pinky can download the developer disk image a
-// computer without Xcode lacks (iPhones), from the first provider that can
+// computer without Xcode lacks, or whose image Apple refused (iPhones),
+// from the first provider that can
 // (driver.DiskImageDownloader); ok is false when none can.
 func (g *Gateway) DiskImageMirror() (driver.DiskImageMirror, bool) {
 	for _, p := range g.opt.Providers {

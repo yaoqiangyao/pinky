@@ -289,6 +289,9 @@ func networkOfflineText(d gateway.DeviceView) string {
 			return locales.PhoneTailnetAway(name)
 		}
 		return locales.PhoneNetworkAway(name)
+	case driver.SetupNotOnWiFi:
+		// An iPhone unplugged that is not seen on Wi-Fi (internal/driver/ios/lost.go).
+		return locales.PhoneNotSeenOnWiFi(name)
 	}
 	return ""
 }

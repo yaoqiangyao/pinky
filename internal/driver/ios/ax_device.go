@@ -52,10 +52,9 @@ func OpenAccessibility(ctx context.Context, info driver.Info) (*AXDevice, error)
 		l.Close()
 		return nil, fmt.Errorf("screenshot: %w", err)
 	}
-	d.scr = screenInfo{Width: cfg.Width, Height: cfg.Height, Scale: 1, Orientation: "rot0"}
-	if cfg.Width > cfg.Height {
-		d.scr.Orientation = "rot90"
-	}
+	// Screenshots are the screen the right way up, so they are its size;
+	// each read takes it again from its screenshot (observeInspector).
+	d.scr = screenInfo{Width: cfg.Width, Height: cfg.Height, Scale: 1}
 	// Connect the accessibility daemon now; its first walk is slow.
 	go func() {
 		c, cancel := context.WithTimeout(context.Background(), 15*time.Second)

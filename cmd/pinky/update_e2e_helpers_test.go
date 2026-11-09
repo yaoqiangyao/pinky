@@ -63,7 +63,7 @@ func waitFor(t *testing.T, what string, d time.Duration, cond func() bool) {
 // Pinky.app's defaults, and so the language picked in its Settings.
 func newsTexts(version string) [][]string {
 	var out [][]string
-	for _, l := range []string{"en", "zh-Hans"} {
+	for _, l := range []string{"en", "zh-Hans", "ja"} {
 		m := locales.In(l)
 		out = append(out, []string{m.UpdateNewsCardTitle(), m.UpdateNewsNow(version)})
 	}

@@ -24,10 +24,6 @@ const (
 	backlightOff      = "off"
 )
 
-// errUnknownBacklight marks a backlight state Pinky does not know, or none
-// at all: an iPhone on iOS 27 was seen to leave it out of its display info.
-var errUnknownBacklight = errors.New("unknown backlight state")
-
 // screenAwake reports whether a backlight state means the screen is on and
 // takes touches. The always-on display counts as asleep.
 func screenAwake(state string) (bool, error) {
@@ -37,7 +33,7 @@ func screenAwake(state string) (bool, error) {
 	case backlightOff, backlightAlwaysOn:
 		return false, nil
 	}
-	return false, fmt.Errorf("%w %q", errUnknownBacklight, state)
+	return false, fmt.Errorf("unknown backlight state %q", state)
 }
 
 // ScreenOn implements driver.Waker.
@@ -130,28 +126,6 @@ func wakeUp(ctx context.Context, p powerPhone) (bool, error) {
 		return true, err
 	}
 	return true, waitFor(ctx, p, wakeWait, p.screenOn, "the screen did not turn on")
-}
-
-// wakeForPad is wakeUp for unlocking, which also wakes a phone that does
-// not say whether its screen is on (errUnknownBacklight): when the phone is
-// locked it presses Home, unless wakeUp already did, and gives the screen
-// wakeWait to come on. On the lock screen Home only lights the screen. An
-// unlocked phone is left alone, since Home would leave the app in front.
-func wakeForPad(ctx context.Context, p powerPhone) (bool, error) {
-	pressed, err := wakeUp(ctx, p)
-	if !errors.Is(err, errUnknownBacklight) {
-		return pressed, err
-	}
-	locked, err := p.locked(ctx)
-	if err != nil || !locked {
-		return pressed, err
-	}
-	if !pressed {
-		if err := p.pressHome(ctx); err != nil {
-			return true, err
-		}
-	}
-	return true, p.sleep(ctx, wakeWait)
 }
 
 // errWaitedOut marks waitFor's failure when the wait passed.
@@ -269,7 +243,7 @@ func unlock(ctx context.Context, p powerPhone, pin string) error {
 // not locked, or Face ID opened it on the way. An error wraps
 // ErrPINNotEntered once the phone was found locked.
 func reachPad(ctx context.Context, p powerPhone) (unlocked bool, err error) {
-	woke, err := wakeForPad(ctx, p)
+	woke, err := wakeUp(ctx, p)
 	if err != nil {
 		return false, fmt.Errorf("unlock: %w", err)
 	}
@@ -307,7 +281,7 @@ func reachPad(ctx context.Context, p powerPhone) (unlocked bool, err error) {
 	for swipe := 1; ; swipe++ {
 		if swipe > 1 {
 			// The screen may have gone dark while the pad was looked for.
-			if _, err := wakeForPad(ctx, p); err != nil {
+			if _, err := wakeUp(ctx, p); err != nil {
 				return false, fmt.Errorf("unlock: %w: %w", err, driver.ErrPINNotEntered)
 			}
 		}
@@ -364,7 +338,7 @@ func (p devicePower) pressHome(ctx context.Context) error {
 // swipeUp swipes from the bottom edge to the middle of the screen, which on
 // the lock screen brings up the passcode pad.
 func (p devicePower) swipeUp(ctx context.Context) error {
-	s := p.d.screen()
+	s := p.d.freshDisplay(ctx).upright()
 	x := s.Width / 2
 	return p.d.Swipe(ctx, screen.Point{X: x, Y: s.Height - 1}, screen.Point{X: x, Y: s.Height / 2}, 300*time.Millisecond)
 }

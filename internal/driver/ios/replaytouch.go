@@ -105,8 +105,14 @@ func dist(a, b screen.Point) float64 {
 // Touch implements driver.Toucher for the mirror: the touch plays back when
 // the finger lifts (see touchRecorder).
 func (d *WDADevice) Touch(ctx context.Context, a driver.TouchAction, p screen.Point) error {
+	// The picture is upright, so its shape says the orientation the
+	// person saw when they touched it.
 	vw, vh := d.videoSize()
-	p = fromVideo(p, vw, vh, d.width, d.height)
+	if vw > 0 && vh > 0 {
+		d.seeOrientation(float64(vw), float64(vh))
+	}
+	w, h := d.size()
+	p = fromVideo(p, vw, vh, w, h)
 	g, err := d.rec.touch(a, p, time.Now())
 	if err != nil || g == nil {
 		return err

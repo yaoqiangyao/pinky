@@ -93,7 +93,7 @@ Each feature is tagged with the milestone that first ships it (see Roadmap). A b
 | Agent access | Live screen inside MCP hosts that support MCP Apps | M4 |
 | Safety | Default policy: commit detection, Ask categories, blocked finance apps; approval panel with Allow once, Deny and Take over; no answer in 60 s denies | M1 |
 | Safety | Emergency stop (global shortcut and Stop all); read-only mode; per-task app allow-list | M1 |
-| Safety | Typing into password and code fields refused; codes in notifications masked; notifications from blocked apps hidden | M1 |
+| Safety | Typing into password and code fields refused; one-time codes masked on the screen and in notifications, and covered in screenshots; notifications from blocked apps hidden | M1 |
 | Safety | Rules editor, per-app rules, "Allow for this task" and "Always allow this kind" | M2 |
 | Safety | Credentials filled from the OS keychain; wider redaction | M2 |
 | Safety | Approve from a notification, a phone push or a chat app | M4 |
@@ -187,7 +187,7 @@ Every action tool also takes `device?` (required when the session holds more tha
 
 ### Sessions and leases
 
-- A lease belongs to one MCP session, which may hold several devices. It ends on `phone_release`, when the session closes, after 10 idle minutes (configurable), or on Stop.
+- A lease belongs to one MCP session, which may hold several devices. It ends on `phone_release`, when the session closes, after 10 idle minutes (configurable), or on Stop. Over HTTP, a newer session of the same agent continues the leases its older sessions are not using, and a closed session's leases wait 2 minutes for it: some clients open a session for every call ([mcp.md](mcp.md#what-http-clients-may-do)).
 - Another session asking for a held device gets `lease_held` with the holder's task name. The person can revoke a lease from the device card.
 - A device that drops mid-action returns `uncertain`, then `device_offline`; if it reconnects within 60 s, the lease survives.
 - An MCP cancellation, or a session that closes, withdraws any open approval panel without acting.
@@ -350,7 +350,7 @@ always_allow:
 - A per-task app allow-list (M1), such as "this task may only use Dinely"; typing into any other app is Ask.
 - Emergency stop: a global shortcut (Option-Command-Period on macOS, Ctrl+Alt+Period elsewhere) and Stop all in the menu bar. It ends every lease and cancels every pending action.
 - Credentials never reach the model. The gateway refuses `phone_type` into password and one-time-code fields (`blocked_by_policy`, rule: credentials) and tells the agent to call `phone_handoff` (M1). From M2 the client can fill the value from the OS keychain, and the agent only learns that it was filled.
-- Notifications from blocked apps are never listed, and digit codes in notifications are masked by default.
+- Notifications from blocked apps are never listed, matched by the app's id or name. Where another screen shows a blocked app (its notification in the shade, on the lock screen or as a heads-up banner, its card in recent apps), the agent gets one hidden element in its place, covered in screenshots. One-time codes are masked by default, on the screen (elements and OCR lines) and in notifications, and covered in the screenshots agents get and history keeps; recordings, which never reach agents, are not covered.
 - `phone_files` reaches only the phone's `Pinky/` folder. Writing to the phone is Ask, and read-only mode turns it off.
 - An agent's first connection needs approval and a scope.
 
@@ -510,7 +510,7 @@ Everything lives in one SQLite database and a media folder in the user data dire
 | `media` | Kind (screenshot, video segment, report), path, size, hash |
 
 - **Media:** a WebP screenshot before and after each step, and MP4 segments remuxed from the device stream without re-encoding.
-- **Retention:** one button wipes everything (M1); default limits of 30 days for video and 180 days for steps come with recording (M2). Blocked apps are never recorded.
+- **Retention:** one button wipes everything (M1); default limits of 30 days for video and 180 days for steps come with recording (M2). A blocked app's screen is never recorded; its notifications and its card in recent apps, which agents get hidden, show in recordings as they were, as one-time codes do.
 - **Encryption:** optional, with the key kept in the OS keychain.
 - **Export:** a single-file HTML report and JSON. iPhone video is HEVC, which browsers play unreliably, so the export transcodes it to H.264 with FFmpeg's hardware encoder, or links the MP4 when that fails.
 

@@ -28,6 +28,9 @@ import (
 type mjpegReader struct {
 	r    *bufio.Reader
 	body io.Closer
+	// upside, when set, is the turn frames whose EXIF says up need: XCTest
+	// tags an upside-down screen as up (WDADevice.pictureTurn).
+	upside func() quarter
 }
 
 // maxJPEG bounds one frame: a full-size screenshot at high quality is a few
@@ -118,7 +121,11 @@ func (m *mjpegReader) next(ctx context.Context) (frame, error) {
 		}
 		return frame{}, fmt.Errorf("MJPEG: %w", err)
 	}
-	return frame{key: frameKey(b), decode: func() (image.Image, error) { return jpeg.Decode(bytes.NewReader(b)) }}, nil
+	turn := exifTurn(b)
+	if turn == 0 && m.upside != nil {
+		turn = m.upside()
+	}
+	return frame{key: frameKey(b), turn: turn, decode: func() (image.Image, error) { return jpeg.Decode(bytes.NewReader(b)) }}, nil
 }
 
 func (m *mjpegReader) Close() error {

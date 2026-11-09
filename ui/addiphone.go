@@ -286,6 +286,12 @@ func (a *app) addIPhoneSteps(c *mg.Context) {
 						}
 					})
 				}
+				// The person chose to offer the third-party copy too when
+				// Apple refuses Xcode's image or one in Pinky's folder, only
+				// on a click.
+				if refusedOffersMirror(d.Info.DiskImage) {
+					a.mirrorOffer(c)
+				}
 				guideNote(c, note)
 			case driver.SetupInstallHelper:
 				// Driven through the helper, which is missing or ran out:
@@ -336,8 +342,9 @@ func (a *app) addIPhoneSteps(c *mg.Context) {
 }
 
 // diskImageDownloader is a gateway that can download the developer disk
-// image a computer without Xcode lacks, from a third-party mirror
-// (gateway.DiskImageMirror and DownloadDiskImage).
+// image a computer without Xcode lacks, or whose image Apple refused,
+// from a third-party mirror (gateway.DiskImageMirror and
+// DownloadDiskImage).
 type diskImageDownloader interface {
 	DiskImageMirror() (driver.DiskImageMirror, bool)
 	DownloadDiskImage(ctx context.Context, progress func(done, total int64)) error

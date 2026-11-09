@@ -133,7 +133,10 @@ func (s *Server) session(req *sdk.CallToolRequest, remote bool) *gateway.Session
 		info.Client = strings.TrimSpace(ci.Name + " " + ci.Version)
 	}
 	if remote {
+		// Clients over HTTP may open a session for every call, or leave
+		// the last one open: a newer session continues the older ones'.
 		info.Name += RemoteSuffix
+		info.Resume = true
 	}
 	gs := s.g.OpenSession(info)
 	s.sessions[req.Session] = gs

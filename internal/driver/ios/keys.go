@@ -106,7 +106,7 @@ func (d *Device) key(ctx context.Context, k driver.Key) error {
 		}
 		return h.button(ctx, consumerPage, usageHome, 60*time.Millisecond)
 	case driver.KeyBack:
-		s := d.screen()
+		s := d.freshDisplay(ctx).upright()
 		y := s.Height / 2
 		return d.Swipe(ctx, screen.Point{X: 0, Y: y}, screen.Point{X: s.Width * 7 / 10, Y: y}, 250*time.Millisecond)
 	case driver.KeyRecents:

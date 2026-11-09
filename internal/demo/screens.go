@@ -115,6 +115,7 @@ func (d *Device) render() *screen.Screen {
 	if d.focus != "" {
 		s.Keyboard = true
 	}
+	s.Elements = append(s.Elements, d.overlay...)
 	return s
 }
 

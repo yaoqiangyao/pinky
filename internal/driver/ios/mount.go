@@ -234,6 +234,10 @@ func classifyMountError(err error) mountProblem {
 	// is Apple's server saying no; the others are the way there.
 	case has("unexpected status in response"):
 		return problemRefused
+	// The server was reached, but its certificate was not trusted: the
+	// internet connection is fine, so show the error itself.
+	case has("x509:", "tls: failed to verify"):
+		return problemOther
 	case has("failed to send request", "unexpected response status", "gs.apple.com", "no such host", "network is unreachable", "i/o timeout"):
 		return problemNetwork
 	}

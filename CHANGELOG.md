@@ -2,15 +2,59 @@
 
 What changed for people in each release of Pinky, newest first. A version is the release's date in Asia/Shanghai and that day's count: 2026.1107.2 is the second release of 7 November 2026. Notes wait under "Unreleased" until the next release takes them; see [docs/RELEASING.md](docs/RELEASING.md).
 
+## Unreleased
+
+- This release brings in all of DIYgod/pinky's updates from 2026.1109.1 to 2026.1109.7, described below. The notes of 2026.1109.1 and 2026.1109.2 are new to flyfox's build as well: its own releases with those numbers didn't have them.
+- Unlocking an iPhone on iOS 27.2 from the computer now reads whether its screen is on from the phone, instead of pressing Home when Pinky couldn't tell.
+
+## 2026.1109.7 (2026-11-09)
+
+- Pinky now speaks Japanese: choose 日本語 in Settings › Advanced › Language, or let it follow a computer set to Japanese. Thanks to tarou-jp for the translation.
+- On Linux, iPhones and iPads work over Wi-Fi: unplugged, Pinky moves them to Wi-Fi instead of showing them offline. Nothing to install beyond `usbmuxd`. Thanks to pseudoyu.
+
+## 2026.1109.6 (2026-11-09)
+
+- When you unplug an iPhone or iPad that doesn't come back over Wi-Fi, Pinky now says so within about 10 seconds on a Mac: Lost on Wi-Fi when your Mac's device service lost it, or Not seen on Wi-Fi, with what may be hiding it, such as another network, a guest network, or a VPN.
+
+## 2026.1109.5 (2026-11-09)
+
+- An iPhone's or iPad's Checkup now has a Wi-Fi item: whether its Wi-Fi connection is on and whether Pinky turned it on, why not if it isn't, and whether this computer sees the phone on the network now. Feedback diagnostics include it too.
+- On iPhones with iOS 27, a blocked app's notification banner over another app is now hidden from agents too, and covered in their screenshots.
+- Settings › Privacy now says that screen recordings show a blocked app's notifications and its card in recent apps as they were; recordings stay on your computer.
+
+## 2026.1109.4 (2026-11-09)
+
+- iPhones and iPads now work in landscape: taps, swipes and what Pinky reads of the screen land in the right place whichever way the device is turned, and the mirror shows the screen the right way up.
+- On iPads whose screen is mounted sideways, such as the iPad Pro, taps no longer land in the wrong place, in portrait too.
+- Through the WebDriverAgent helper, alerts that show in landscape can now be tapped where they appear, an iPad held upside down shows the right way up, and Back on an iPad goes back instead of opening dictation.
+- Recordings of an iPhone or iPad play back the right way up, also when the device was turned while recording.
+
+## 2026.1109.3 (2026-11-09)
+
+- A blocked app's notifications are now hidden from agents in the notification shade, on the lock screen and in banners, and its card in recent apps too: the agent reads only that something is hidden there, and its screenshots, and those in Activity, cover it with a gray box.
+- Notifications of an app you blocked by its name are now hidden as well, not only those of apps blocked by their package.
+- Settings › Safety › Add app now offers the apps on your phones to pick from, and warns when the name you type matches none of them.
+- More Chinese banks' credit card apps are blocked by default, such as 买单吧, 发现精彩, 动卡空间, 浦大喜奔 and 全民生活, and Shanghai Pudong Development Bank's app is now recognized by its package.
+- A disk image you put in Pinky's folder yourself now gets the same offer to download the third-party mirror's image when Apple won't sign it.
+
 ## 2026.1109.2 (2026-11-09)
 
-- Updating Pinky on Windows finds the installed Pinky again in flyfox's build, whose installer names it com.flyfox.pinky.
+- When Apple won't sign the developer disk image of Xcode on your Mac, Add phone now also offers to download the image from the third-party mirror, and Pinky then uses that image instead of the refused one, also after a restart.
+- When a phone drops for a moment and comes back, an agent's request now waits until Pinky has reconnected it, instead of failing as offline.
+- On a slow computer, pairing over Wi-Fi no longer ends with "The phone didn't answer in time" when the phone paired but Pinky couldn't find it on the network; it asks for the address Wireless debugging shows, as on other computers.
 
 ## 2026.1109.1 (2026-11-09)
 
-- Unlocking an iPhone from the computer now works when the phone doesn't say whether its screen is on, as some iPhones on iOS 27 do.
-- Pinky now comes from flyfox's fork, yaoqiangyao/pinky, for Windows and iPhones on iOS 27 or later. It updates from there, and Help › Send Feedback… opens an issue there.
-- Pinky no longer sends usage statistics or crash reports.
+- On iOS 27.2, "Unlock from this computer" works again instead of failing with "unknown backlight state".
+- On Linux, iPhones no longer get stuck in "Needs setup" because Pinky didn't trust Apple's signing server. A certificate problem with that server now shows the actual error instead of asking you to check the internet connection.
+- On Linux with KDE Wallet, "Unlock from this computer" now asks for the wallet's password instead of failing with "Can't lock object".
+
+## 2026.1108.25 (2026-11-08)
+
+- One-time codes are now hidden from agents everywhere on the phone's screen, not only in notifications: a code in a text message, an email or an iPhone banner reaches the agent as ••••••, and screenshots agents get, and those in Activity, cover it with a gray box. Screen recordings, which stay on your computer, are not covered.
+- Agents connected over HTTP keep the phone from one call to the next, also when their client never sends back the session id (such as Grok Bot) or opens a new connection for every call. No proxy in front of Pinky is needed any more.
+- All phones now scrolls when you have more phones than fit in the window, and a last row that isn't full lines up under the phones above instead of sitting in the middle.
+- With many phones, the sidebar's list of phones scrolls too, so Add phone, Activity, Settings and Stop all stay within reach.
 
 ## 2026.1108.24 (2026-11-08)
 

@@ -304,6 +304,7 @@ func (g *Gateway) endLeaseLocked(l *lease, outcome, summary string) {
 	}
 	if outcome == OutcomeStopped {
 		l.session.barred[d.id] = true
+		g.noteStopLocked(l.session, d.id)
 	}
 	l.cancel()
 	t := l.task

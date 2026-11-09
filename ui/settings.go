@@ -239,15 +239,7 @@ func (a *app) settingsSafety(c *mg.Context) {
 			}
 		})
 		if a.set.adding {
-			mg.Row(c).Gap(8).AlignItems(mg.Center).Children(func() {
-				in := mg.TextInput(c.Key("new-blocked"), &a.set.newApp).Placeholder(locales.SettingsSafetyAppPlaceholder()).Grow(1).AutoFocus().Label(locales.SettingsSafetyAppLabel())
-				add := button(c, locales.SettingsSafetyBlock(), btnOpt{kind: btnPrimary})
-				if (in.Submitted() || add.Clicked()) && strings.TrimSpace(a.set.newApp) != "" {
-					st.BlockedApps = append(st.BlockedApps, BlockedApp{Name: strings.TrimSpace(a.set.newApp), Kind: "Blocked by you"})
-					a.set.newApp, a.set.adding = "", false
-					a.changed()
-				}
-			})
+			a.addBlockedApp(c)
 		}
 		mg.Column(c).Children(func() {
 			for i, b := range st.BlockedApps {

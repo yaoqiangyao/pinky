@@ -76,6 +76,40 @@ type Element struct {
 	Path string
 	// ID is the platform's resource id or accessibility identifier, if any.
 	ID string
+	// Masked is set when Pinky masked a one-time code in Label (policy);
+	// pictures of the screen cover Bounds. It is never shown to agents.
+	Masked bool
+	// Hidden is set on the element that stands in for what Pinky hid from
+	// agents on another app's screen: a blocked app's notification in the
+	// shade, or its card in recent apps. Label says so; pictures of the
+	// screen cover Bounds, and are not taken when Bounds is empty.
+	Hidden bool
+}
+
+// notificationID starts the ID of an element that stands for a
+// notification shown over the app, which has no resource id of its own:
+// an iPhone's banner, which SpringBoard draws.
+const notificationID = "pinky:notification"
+
+// NotificationID returns the ID of an element that stands for a
+// notification shown over the app, posted by app (a bundle id or package;
+// "" when the driver cannot tell). Its label starts with the app's name,
+// and the gateway hides the notifications of blocked apps.
+func NotificationID(app string) string {
+	if app == "" {
+		return notificationID
+	}
+	return notificationID + ":" + app
+}
+
+// NotificationApp reports whether an element's ID is a NotificationID,
+// and returns the app that posted the notification, if known.
+func NotificationApp(id string) (app string, ok bool) {
+	if id == notificationID {
+		return "", true
+	}
+	app, ok = strings.CutPrefix(id, notificationID+":")
+	return app, ok
 }
 
 // Has reports whether the element is in the given state.

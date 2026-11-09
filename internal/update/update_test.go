@@ -349,6 +349,7 @@ func TestNotesIn(t *testing.T) {
 		"en":         f.Notes,
 		"":           f.Notes,
 		"zh-Hant":    f.Notes, // another script
+		"ja":         f.Notes, // no Japanese notes: English, not the Chinese
 		"fr":         f.Notes, // empty notes
 	} {
 		if got := f.NotesIn(lang); got != want {

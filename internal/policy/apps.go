@@ -113,9 +113,9 @@ func (a *Apps) Apply(o AppOverrides) {
 }
 
 // Categories returns the categories of an app, sorted. An app the table
-// does not know whose name says it is a bank, a wallet, a brokerage or a
-// remittance service ("DBS digibank", "Trust Wallet", "某某银行") is a
-// finance app, unless apps.yaml excludes it.
+// does not know whose name says it is a bank, a credit card, a wallet, a
+// brokerage or a remittance service ("DBS digibank", "Trust Wallet",
+// "某某银行", "某行信用卡") is a finance app, unless apps.yaml excludes it.
 func (a *Apps) Categories(app screen.App) []string {
 	var out []string
 	id, name := strings.TrimSpace(app.ID), strings.ToLower(strings.TrimSpace(app.Name))
@@ -141,11 +141,11 @@ func (a *Apps) Categories(app screen.App) []string {
 	return out
 }
 
-// financeNameParts mark a bank, a wallet, a brokerage or a remittance
-// service in a lower-case app name.
+// financeNameParts mark a bank, a credit card, a wallet, a brokerage or a
+// remittance service in a lower-case app name.
 var financeNameParts = []string{
 	"bank", "wallet", "remit", "securities",
-	"银行", "銀行", "은행", "证券", "證券", "証券", "증권", "钱包", "錢包", "ウォレット", "지갑",
+	"银行", "銀行", "은행", "信用卡", "证券", "證券", "証券", "증권", "钱包", "錢包", "ウォレット", "지갑",
 }
 
 // financeName reports whether a lower-case app name is a finance app's:

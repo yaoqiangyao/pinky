@@ -144,7 +144,8 @@ func (s *Server) newUploadLink(ctx context.Context, req *sdk.CallToolRequest, gs
 	url, where := UploadPath+token, " at the address you reach Pinky's /mcp at"
 	if req.Extra != nil {
 		if base := req.Extra.Header.Get(linkBaseHeader); base != "" {
-			url, where = base+UploadPath+token, ""
+			// Through a tunnel or proxy, this may be Pinky's own address.
+			url, where = base+UploadPath+token, " (if this address does not reach Pinky from your machine, use the one you reach its /mcp at, with the same path)"
 		}
 	}
 	return render(&gateway.Result{Status: gateway.StatusSettled, DeviceName: res.DeviceName, Message: fmt.Sprintf(
@@ -209,7 +210,9 @@ func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 		reply(http.StatusNotFound, `This upload link is unknown, used or expired. Call phone_files { action: "upload" } again for a new one.`)
 		return
 	}
-	res := u.gs.Files(r.Context(), gateway.FilesRequest{Call: gateway.Call{Device: u.device}, Action: "upload",
+	// The session that asked for the link, or the newer one of its agent
+	// that carries on with the phone.
+	res := u.gs.Current().Files(r.Context(), gateway.FilesRequest{Call: gateway.Call{Device: u.device}, Action: "upload",
 		Paths: []string{u.path}, Body: r.Body, Replace: u.replace})
 	var b strings.Builder
 	writeResult(&b, res, "")

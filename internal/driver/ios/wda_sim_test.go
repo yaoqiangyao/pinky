@@ -14,6 +14,8 @@ package ios
 import (
 	"bytes"
 	"context"
+	"image/png"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -301,4 +303,137 @@ func TestWDASim(t *testing.T) {
 		}
 		d.Key(simCtx(t, 20*time.Second), driver.KeyHome)
 	})
+}
+
+// TestWDASimOrientations turns the Simulator through each orientation in
+// Safari, which turns on iPhones and iPads: the screen's size follows it,
+// every element lies on the screen, a landscape screen has elements past
+// the portrait width, and the live picture comes the right way up.
+//
+//	PINKY_WDA_URL=… PINKY_MJPEG_URL=… go test -tags wdasim -count=1 -v -run TestWDASimOrientations ./internal/driver/ios/
+func TestWDASimOrientations(t *testing.T) {
+	d := simDevice(t)
+	setOrientation := func(o string) {
+		t.Helper()
+		if err := d.c.do(simCtx(t, 20*time.Second), d.c.hc, http.MethodPost, "/orientation", map[string]any{"orientation": o}, nil); err != nil {
+			t.Fatalf("orientation %s: %v", o, err)
+		}
+		time.Sleep(1500 * time.Millisecond)
+	}
+	t.Cleanup(func() { setOrientation("PORTRAIT") })
+	if err := d.Launch(simCtx(t, 30*time.Second), "com.apple.mobilesafari"); err != nil {
+		t.Fatal(err)
+	}
+	short := min(d.width, d.height)
+	for _, o := range []string{"LANDSCAPE", "UIA_DEVICE_ORIENTATION_LANDSCAPERIGHT", "PORTRAIT"} {
+		t.Run(o, func(t *testing.T) {
+			setOrientation(o)
+			landscape := o != "PORTRAIT"
+			s := simWait(t, d, "Safari "+o, func(s *screen.Screen) bool {
+				return s.App.ID == "com.apple.mobilesafari" && (s.Width > s.Height) == landscape
+			})
+			if s.Orientation != orientationOf(s.Width, s.Height) {
+				t.Fatalf("%dx%d named %s", s.Width, s.Height, s.Orientation)
+			}
+			far := 0
+			for _, e := range s.Elements {
+				b := e.Bounds
+				if b.Empty() {
+					continue
+				}
+				if b.X < 0 || b.Y < 0 || b.X+b.W > s.Width+2 || b.Y+b.H > s.Height+2 {
+					t.Errorf("%q at %+v, off a %dx%d screen", e.Label, b, s.Width, s.Height)
+				}
+				far = max(far, b.X+b.W)
+			}
+			if landscape && far <= short {
+				t.Errorf("no element past the portrait width %d (furthest edge %d)", short, far)
+			}
+			if os.Getenv("PINKY_MJPEG_URL") == "" {
+				return
+			}
+			st, err := d.Stream(simCtx(t, 20*time.Second), driver.StreamOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer st.Close()
+			if w, h := st.Size(); (w > h) != landscape {
+				t.Errorf("the picture is %dx%d in %s", w, h, o)
+			}
+		})
+	}
+}
+
+// TestWDASimUpsideDown turns an iPad Simulator upside down in Settings:
+// XCTest's screenshot and picture come as the panel is, so Pinky turns
+// them; OCR then finds General's text where the tree puts the element,
+// and the picture's frames carry the half turn. iPhones never turn upside
+// down, so the test skips on them.
+func TestWDASimUpsideDown(t *testing.T) {
+	d := simDevice(t)
+	set := func(o string) error {
+		err := d.c.do(simCtx(t, 20*time.Second), d.c.hc, http.MethodPost, "/orientation", map[string]any{"orientation": o}, nil)
+		time.Sleep(1500 * time.Millisecond)
+		return err
+	}
+	if err := d.Launch(simCtx(t, 30*time.Second), "com.apple.Preferences"); err != nil {
+		t.Fatal(err)
+	}
+	if err := set("UIA_DEVICE_ORIENTATION_PORTRAIT_UPSIDEDOWN"); err != nil {
+		t.Skipf("no upside down here (an iPhone): %v", err)
+	}
+	t.Cleanup(func() { set("PORTRAIT") })
+	if q := d.interfaceTurn(simCtx(t, 10*time.Second)); q != 2 {
+		t.Skipf("the interface did not turn upside down (turn %d)", q)
+	}
+	s := simWait(t, d, "Settings upside down", func(s *screen.Screen) bool {
+		_, ok := findLabel(s, "General")
+		return ok && s.App.ID == "com.apple.Preferences"
+	})
+	if s.Width > s.Height {
+		t.Fatalf("upside down read as %dx%d", s.Width, s.Height)
+	}
+	var gen screen.Element
+	for _, e := range s.Elements {
+		if strings.HasPrefix(e.Label, "General") && e.Role == screen.RoleButton {
+			gen = e
+			break
+		}
+	}
+	img, err := d.Screenshot(simCtx(t, 30*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatal(err)
+	}
+	lines, err := recognizeText(b.Bytes(), ocrOptions{Languages: ocrLanguages})
+	if err != nil {
+		t.Skipf("no OCR here: %v", err)
+	}
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
+	found := false
+	for _, l := range lines {
+		r := ocrRect(l, w, h)
+		c := r.Center()
+		if strings.TrimSpace(l.Text) == "General" && c.X >= gen.Bounds.X && c.X <= gen.Bounds.X+gen.Bounds.W &&
+			c.Y >= gen.Bounds.Y-20 && c.Y <= gen.Bounds.Y+gen.Bounds.H+20 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("OCR did not find General at the tree's %+v: the screenshot is not upright", gen.Bounds)
+	}
+	if os.Getenv("PINKY_MJPEG_URL") == "" {
+		return
+	}
+	st, err := d.Stream(simCtx(t, 20*time.Second), driver.StreamOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if q, ok := st.(*frameStream).lastTurn(); !ok || q != 2 {
+		t.Fatalf("the picture's frames turned %d (%v), want a half turn", q, ok)
+	}
 }

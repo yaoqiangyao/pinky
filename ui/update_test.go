@@ -433,6 +433,14 @@ func TestWhatsNewInTheAppsLanguage(t *testing.T) {
 	if !hasText(tt, "Typing works") || !hasText(tt, "2026.1107.3 · November 7, 2026") || hasText(tt, "打字正常了") {
 		t.Errorf("What's new in English: %q", tt.Texts())
 	}
+	// In Japanese, which the changelog has no translation into, the
+	// English notes with Japanese dates, not the Chinese notes.
+	inLanguage(t, "ja", tt)
+	tt.Frame()
+	day = locales.DayOtherYear(time.Date(2026, 11, 7, 0, 0, 0, 0, time.UTC))
+	if !hasText(tt, "Typing works") || !hasText(tt, "2026.1107.3 · "+day) || hasText(tt, "打字正常了") {
+		t.Errorf("What's new in Japanese: %q", tt.Texts())
+	}
 }
 
 func TestCompanionUpdatesWhenThePhoneIsFree(t *testing.T) {

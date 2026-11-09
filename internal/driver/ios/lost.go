@@ -56,6 +56,21 @@ const (
 	// every few seconds.
 	lostQuiet = 10 * time.Minute
 	lostPause = 5 * time.Minute
+
+	// A phone whose cable was just pulled is not one that sleeps: usbmuxd
+	// lists it over Wi-Fi about 2 s after the pull, when its Wi-Fi
+	// connection is on. So for unplugRecent after a pull, one the network
+	// shows that usbmuxd still does not list unplugGrace after it is lost
+	// (an owner waited 75 s for Lost on Wi-Fi after unplugging, 2026-11-09),
+	// and one that neither shows notSeenAfter after it is not seen on Wi-Fi
+	// at all: another network, one that keeps devices apart, a VPN, or
+	// asleep. Only for phones whose Wi-Fi connection Pinky knows is on.
+	unplugGrace  = 8 * time.Second
+	notSeenAfter = 15 * time.Second
+	unplugRecent = 10 * time.Minute
+	// notSeenSearch is how long the search must have run to say a phone
+	// is not on the network: answers take a moment to come.
+	notSeenSearch = 5 * time.Second
 )
 
 // mobdevService is the service type a phone advertises for Wi-Fi sync.
@@ -74,7 +89,10 @@ type lostState struct {
 	macs    map[string]pairMAC   // by UDID
 	seen    map[string]time.Time // by UDID: on the network since, while missing from usbmuxd's list
 	names   map[string]driver.Info
-	reports map[string]bool // logged as lost
+	reports map[string]bool      // logged as lost
+	cabled  map[string]time.Time // by UDID: when usbmuxd last listed it on a cable
+	netted  map[string]time.Time // by UDID: when usbmuxd last listed it over the network
+	notSeen map[string]bool      // logged as not seen on Wi-Fi
 
 	// For tests.
 	browseFn func() (bonjourSource, error)
@@ -111,9 +129,13 @@ func (p *Provider) remember(infos []driver.Info) {
 }
 
 // lostPhones returns the phones the person uses that usbmuxd does not list
-// though they have shown up on the network for lostAfter: listed are the
-// UDIDs usbmuxd lists now. It starts and stops the search as needed.
-func (p *Provider) lostPhones(listed map[string]bool) []driver.Info {
+// though they have shown up on the network for lostAfter (unplugGrace after
+// a pull), and those not seen on Wi-Fi at all a moment after a pull: listed
+// are the UDIDs usbmuxd lists now, cabled those it lists on a cable, netted
+// those it lists over the network. A phone usbmuxd listed over the network
+// after its pull came through it, and may be asleep now: the slow rule. It
+// starts and stops the search as needed.
+func (p *Provider) lostPhones(listed, cabled, netted map[string]bool) []driver.Info {
 	w := &p.lost
 	if runtime.GOOS != "darwin" && !w.anyOS {
 		return nil // the macOS usbmuxd's bug; others not seen
@@ -121,13 +143,27 @@ func (p *Provider) lostPhones(listed map[string]bool) []driver.Info {
 	p.mu.Lock()
 	on := p.wifi.on
 	var missing []string
+	connOn := map[string]bool{} // Pinky knows its Wi-Fi connection is on (wifiallow.go)
 	for id := range p.wifi.use {
 		if !listed[id] && !p.wifi.forgot[id] {
 			missing = append(missing, id)
+			r := p.wifi.allowed[id].result
+			connOn[id] = r == driver.WiFiConnectionsOn || r == driver.WiFiConnectionsTurnedOn
 		}
 	}
 	now := p.clock()
 	p.mu.Unlock()
+	w.mu.Lock()
+	if w.cabled == nil {
+		w.cabled, w.netted = map[string]time.Time{}, map[string]time.Time{}
+	}
+	for id := range cabled {
+		w.cabled[id] = now
+	}
+	for id := range netted {
+		w.netted[id] = now
+	}
+	w.mu.Unlock()
 	if !on {
 		w.mu.Lock()
 		w.stopLocked()
@@ -144,6 +180,9 @@ func (p *Provider) lostPhones(listed map[string]bool) []driver.Info {
 		w.macs = map[string]pairMAC{}
 		w.seen = map[string]time.Time{}
 		w.reports = map[string]bool{}
+	}
+	if w.notSeen == nil {
+		w.notSeen = map[string]bool{}
 	}
 	var toRead []string
 	for _, id := range missing {
@@ -213,18 +252,39 @@ func (p *Provider) lostPhones(listed map[string]bool) []driver.Info {
 	var out []driver.Info
 	for _, id := range missing {
 		mac := w.macs[id].mac
+		pulled := w.cabled[id]
+		recent := connOn[id] && !pulled.IsZero() && now.Sub(pulled) < unplugRecent && !w.netted[id].After(pulled)
 		if mac == "" || !onNet[mac] {
 			delete(w.seen, id)
 			delete(w.reports, id)
+			if mac != "" && recent && now.Sub(pulled) >= notSeenAfter && now.Sub(w.started) >= notSeenSearch {
+				if !w.notSeen[id] {
+					w.notSeen[id] = true
+					p.logger().Warn("iphone: not seen on Wi-Fi since its cable was pulled: usbmuxd does not list it, and the network does not show it", "device", id, "wifi_mac", mac, "pulled", pulled)
+				}
+				info := w.names[id]
+				info.ID, info.Platform, info.Connection, info.Backend = id, driver.IOS, "wifi", backendCoreDevice
+				info.State, info.Setup, info.Detail = driver.StateOffline, driver.SetupNotOnWiFi, notSeenDetail
+				out = append(out, info)
+			}
 			continue
 		}
+		delete(w.notSeen, id)
 		w.onNet = now
 		since, ok := w.seen[id]
 		if !ok {
-			w.seen[id] = now
-			continue
+			w.seen[id], since = now, now
 		}
-		if now.Sub(since) < lostAfter {
+		wait := lostAfter
+		if recent {
+			// Just unplugged: usbmuxd lists a phone over Wi-Fi within
+			// seconds, or has lost it.
+			if now.Sub(pulled) < unplugGrace {
+				continue
+			}
+			wait = 0
+		}
+		if now.Sub(since) < wait || (!recent && !ok) {
 			continue
 		}
 		if !w.reports[id] {
@@ -242,6 +302,11 @@ func (p *Provider) lostPhones(listed map[string]bool) []driver.Info {
 			delete(w.reports, id)
 		}
 	}
+	for id := range w.notSeen {
+		if listed[id] {
+			delete(w.notSeen, id)
+		}
+	}
 	return out
 }
 
@@ -252,6 +317,10 @@ func (w *lostState) stopLocked() {
 		w.src = nil
 	}
 }
+
+// notSeenDetail is the Detail of a phone not seen on Wi-Fi since its cable
+// was pulled, which the gateway's status line shows.
+const notSeenDetail = "Not seen on Wi-Fi"
 
 // lostDetail says what is wrong with a phone usbmuxd lost.
 const lostDetail = "This Mac's device service (usbmuxd) lost the iPhone on Wi-Fi: the iPhone is on the network, but the service no longer lists it, and may not for up to an hour. Restarting the service brings it back."

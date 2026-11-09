@@ -231,8 +231,11 @@ func (d *Device) videoFrame(ctx context.Context, frame func(context.Context) (im
 	f, err := frame(fctx)
 	cancel()
 	if err == nil {
-		if s, ok := screenOfFrame(f, d.screen()); ok {
-			return s, true
+		// The video is in the display's own frame: cut the screen out of
+		// it there, then turn it upright as screenshots are.
+		si := d.freshDisplay(ctx)
+		if s, ok := screenOfFrame(f, si); ok {
+			return turnImage(s, si.turn()), true
 		}
 	}
 	if ctx.Err() != nil {
@@ -252,8 +255,8 @@ func (d *Device) ScreenshotFromFrame(ctx context.Context, frame func(context.Con
 }
 
 // screenOfFrame is the screen in a frame of the live video, in the
-// screenshot's pixels: the phone puts its screen at 1:1 in the picture's
-// top-left corner and pads the rest (fromVideo). ok is false for a picture
+// display's own frame (si's Width and Height): the phone puts its screen at
+// 1:1 in the picture's top-left corner and pads the rest (fromVideo). ok is false for a picture
 // smaller than the screen, which no tested phone sends, or without a known
 // screen size.
 func screenOfFrame(f image.Image, si screenInfo) (image.Image, bool) {

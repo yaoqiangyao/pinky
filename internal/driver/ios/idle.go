@@ -67,6 +67,34 @@ func (d *Device) idleLoop() {
 	}
 }
 
+// orientPoll is how often the display's orientation is read while anyone
+// watches the video: the packets carry it, so the mirror turns with the
+// device within about this long.
+const orientPoll = time.Second
+
+// orientLoop reads the display's orientation every orientPoll while a view
+// of the video is open. Nothing else tells Pinky the device turned: the
+// picture keeps the display's own frame and size.
+func (d *Device) orientLoop() {
+	t := time.NewTicker(orientPoll)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			d.mu.Lock()
+			watched := d.watchers > 0 && d.m != nil
+			d.mu.Unlock()
+			if watched {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				d.readDisplayNow(ctx)
+				cancel()
+			}
+		case <-d.done:
+			return
+		}
+	}
+}
+
 // stopIfIdle stops the stream and the HID session on it when no view has
 // been open and no input sent for streamIdle. It reports whether it did.
 func (d *Device) stopIfIdle(now time.Time) bool {

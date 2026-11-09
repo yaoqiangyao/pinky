@@ -24,8 +24,11 @@ type Frame struct {
 	Width, Height int
 	Seq           uint64        // counts the pictures decoded
 	PTS           time.Duration // the packet's PTS
-	Received      time.Time     // when its packet arrived
-	Ready         time.Time     // when it was converted
+	// Turn is how many quarter turns clockwise put the picture the right
+	// way up (driver.Packet.Turn), from the packet it was decoded from.
+	Turn     int
+	Received time.Time // when its packet arrived
+	Ready    time.Time // when it was converted
 }
 
 // PlayerOptions tune a Player.
@@ -172,6 +175,7 @@ func (p *Player) run(dec *Decoder) {
 	skipping := false
 	for pkt := range packets {
 		received := time.Now()
+		turn := pkt.Turn
 		// Behind by more than the backlog: drop everything up to the next
 		// key frame, which the decoder can start from.
 		if !skipping && len(packets) > p.opt.MaxBacklog {
@@ -207,7 +211,7 @@ func (p *Player) run(dec *Decoder) {
 				break
 			}
 			decoded := time.Now()
-			if p.convert(dec, pic, received, decoded) {
+			if p.convert(dec, pic, turn, received, decoded) {
 				notify()
 			}
 		}
@@ -226,7 +230,7 @@ func (p *Player) run(dec *Decoder) {
 // While nobody takes pictures (a window out of sight paints nothing), it
 // keeps the one waiting and converts nothing: decoding goes on, as later
 // pictures depend on earlier ones.
-func (p *Player) convert(dec *Decoder, pic Picture, received, decoded time.Time) bool {
+func (p *Player) convert(dec *Decoder, pic Picture, turn int, received, decoded time.Time) bool {
 	p.mu.Lock()
 	if p.ready && time.Since(p.lastTake) > time.Second {
 		p.stats.Idle++
@@ -259,6 +263,7 @@ func (p *Player) convert(dec *Decoder, pic Picture, received, decoded time.Time)
 	}
 	now := time.Now()
 	f.Width, f.Height = pic.Width, pic.Height
+	f.Turn = turn & 3
 	f.PTS, f.Received, f.Ready = pic.PTS, received, now
 
 	p.mu.Lock()

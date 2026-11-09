@@ -540,6 +540,8 @@ func statusLine(d gateway.DeviceView) string {
 		return locales.GwStatusLockedOnWiFi()
 	case "Lost on Wi-Fi":
 		return locales.GwStatusLostOnWiFi()
+	case "Not seen on Wi-Fi":
+		return locales.GwStatusNotSeenOnWiFi()
 	case "Connecting":
 		return locales.GwStatusConnecting()
 	case "Moving to Wi-Fi":

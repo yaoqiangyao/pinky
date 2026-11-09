@@ -119,7 +119,12 @@ func checkImage(ctx context.Context, l *link, ownDir string, coreDevice bool) dr
 		return c
 	}
 	mounted := mountedImage(ctx, l)
-	img, err := findDiskImage(ownDir)
+	// The image the preparer would take, passing over those Apple refused.
+	refused := readRefusals(ownDir)
+	img, err := findDiskImageAvoiding(ownDir, func(img diskImage) bool {
+		_, ok := refused[refusalKey(img)]
+		return ok
+	})
 	if err != nil {
 		c.Status, c.Fix = driver.CheckWarn, driver.SetupNoDiskImage
 		c.Detail = mounted + "; this computer has no developer disk image to mount again should it go missing, as it does below iOS 27 when the iPhone restarts (" + err.Error() + ")"

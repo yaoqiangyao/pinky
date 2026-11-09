@@ -10,6 +10,7 @@ import (
 
 	"github.com/DIYgod/pinky/internal/driver"
 	"github.com/DIYgod/pinky/internal/driver/android/mdns"
+	goios "github.com/danielpaulus/go-ios/ios"
 )
 
 // fakeBonjour is a search that finds what the test puts on the network.
@@ -161,5 +162,105 @@ func TestLostSearchPauses(t *testing.T) {
 	listed(t, w.Provider)
 	if browses != 2 {
 		t.Fatalf("%d searches after the pause, want 2", browses)
+	}
+}
+
+// TestUnpluggedPhone: a phone whose cable was just pulled, whose Wi-Fi
+// connection Pinky knows is on, is lost unplugGrace after the pull when the
+// network shows it and usbmuxd does not, without waiting lostAfter; and not
+// seen on Wi-Fi notSeenAfter after the pull when neither shows it. Phones
+// whose Wi-Fi connection Pinky does not know is on, and pulls long ago,
+// keep the slow rule.
+func TestUnpluggedPhone(t *testing.T) {
+	const mac = "08:87:c7:2a:8a:db"
+	instance := mac + "@fe80::a87:c7ff:fe2a:8adb-supportsRP-26"
+	setup := func(conn func(context.Context, goios.DeviceEntry) (bool, error)) (*wifiProvider, *fakeBonjour) {
+		w := newWiFiProvider(entry("iphone", 3, "USB"))
+		w.lost.anyOS = true
+		net := &fakeBonjour{}
+		w.lost.browseFn = func() (bonjourSource, error) { return net, nil }
+		w.lost.pairFn = func(string) (string, error) { return mac, nil }
+		w.wifi.allowFn = conn
+		w.SetWiFi(true)
+		w.UseOverWiFi("iphone")
+		listed(t, w.Provider) // on the cable: its Wi-Fi connection is looked at
+		w.wifi.allowing.Wait()
+		listed(t, w.Provider)
+		return w, net
+	}
+	on := func(context.Context, goios.DeviceEntry) (bool, error) { return false, nil }
+
+	// On the network, not in usbmuxd's list: lost unplugGrace after the pull.
+	w, net := setup(on)
+	w.set()
+	net.set(instance)
+	if got := listed(t, w.Provider); len(got) != 0 {
+		t.Fatalf("lost at the pull: %+v", got)
+	}
+	w.after(unplugGrace)
+	if got := listed(t, w.Provider)["iphone"]; got.Setup != driver.SetupDeviceService {
+		t.Fatalf("%v after the pull: %+v; want lost", unplugGrace, got)
+	}
+	// usbmuxd lists it after all: it is not lost.
+	w.set(entry("iphone", 9, "Network"))
+	if got := listed(t, w.Provider)["iphone"]; got.Setup == driver.SetupDeviceService {
+		t.Fatalf("listed again: %+v", got)
+	}
+
+	// Neither shows it: not seen on Wi-Fi notSeenAfter after the pull.
+	w, net = setup(on)
+	w.set()
+	listed(t, w.Provider)
+	w.after(notSeenAfter - time.Second)
+	if got := listed(t, w.Provider); len(got) != 0 {
+		t.Fatalf("not seen too soon: %+v", got)
+	}
+	w.after(time.Second)
+	got := listed(t, w.Provider)["iphone"]
+	if got.State != driver.StateOffline || got.Setup != driver.SetupNotOnWiFi || got.Detail != notSeenDetail {
+		t.Fatalf("%v after the pull: %+v; want not seen on Wi-Fi", notSeenAfter, got)
+	}
+	// It shows up on the network: then usbmuxd has lost it.
+	net.set(instance)
+	if got := listed(t, w.Provider)["iphone"]; got.Setup != driver.SetupDeviceService {
+		t.Fatalf("on the network after all: %+v", got)
+	}
+
+	// Its Wi-Fi connection did not turn on: the slow rule.
+	w, net = setup(func(context.Context, goios.DeviceEntry) (bool, error) { return false, errors.New("no answer") })
+	w.set()
+	net.set(instance)
+	listed(t, w.Provider)
+	w.after(notSeenAfter)
+	if got := listed(t, w.Provider); len(got) != 0 {
+		t.Fatalf("a phone whose Wi-Fi connection is not known on: %+v", got)
+	}
+	w.after(lostAfter)
+	if got := listed(t, w.Provider)["iphone"]; got.Setup != driver.SetupDeviceService {
+		t.Fatalf("after lostAfter: %+v; want lost", got)
+	}
+
+	// Listed over Wi-Fi after the pull, then gone (asleep): the slow rule.
+	w, net = setup(on)
+	w.after(2 * time.Second)
+	w.set(entry("iphone", 9, "Network"))
+	listed(t, w.Provider)
+	w.after(time.Minute)
+	w.set()
+	net.set(instance)
+	listed(t, w.Provider)
+	w.after(notSeenAfter)
+	if got := listed(t, w.Provider); len(got) != 0 {
+		t.Fatalf("a phone that came over Wi-Fi after the pull: %+v", got)
+	}
+
+	// A pull long ago: the slow rule, and no not-seen notice.
+	w, net = setup(on)
+	w.set()
+	w.after(unplugRecent)
+	listed(t, w.Provider)
+	w.after(notSeenAfter)
+	if got := listed(t, w.Provider); len(got) != 0 {
+		t.Fatalf("a pull long ago: %+v", got)
 	}
 }

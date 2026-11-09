@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"strings"
@@ -488,6 +489,18 @@ func (c *wdaClient) activeApp(ctx context.Context) (wdaApp, error) {
 	var a wdaApp
 	err := c.call(ctx, c.hc, http.MethodGet, "/wda/activeAppInfo", nil, &a)
 	return a, err
+}
+
+// rotation is GET /rotation: the active app's interface orientation as a
+// turn around z, 0, 90, 180 or 270 degrees, clockwise from portrait. Unlike
+// GET /orientation, which WebDriver folds into portrait and landscape, it
+// tells upside down apart.
+func (c *wdaClient) rotation(ctx context.Context) (int, error) {
+	var r struct {
+		Z float64 `json:"z"`
+	}
+	err := c.call(ctx, c.hc, http.MethodGet, "/rotation", nil, &r)
+	return int(math.Round(r.Z)), err
 }
 
 func (c *wdaClient) locked(ctx context.Context) (bool, error) {

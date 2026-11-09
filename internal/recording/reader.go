@@ -21,7 +21,8 @@ import (
 // Info describes a recording file.
 type Info struct {
 	Codec         driver.Codec
-	Width, Height int
+	Width, Height int           // as encoded, before any turn
+	Turn          int           // quarter turns clockwise that put the first picture upright
 	Length        time.Duration // from the start to the end of the last frame
 	Frames        int
 }
@@ -38,7 +39,7 @@ func Probe(path string) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
-	info := Info{Codec: idx.codec, Width: idx.w, Height: idx.h}
+	info := Info{Codec: idx.codec, Width: idx.w, Height: idx.h, Turn: idx.turn0}
 	for _, s := range idx.samples {
 		info.Frames++
 		if e := fromTicks(s.t + uint64(s.dur)); e > info.Length {
@@ -56,6 +57,8 @@ type index struct {
 	params  [][]byte
 	lenSize int // bytes of each NAL unit's length
 	samples []indexed
+	turn0   int          // the first picture's turn, from the track's matrix
+	turns   []turnChange // turns after that, from Pinky's turn boxes (turn.go)
 }
 
 type indexed struct {
@@ -128,6 +131,16 @@ func readIndex(r io.ReaderAt) (*index, error) {
 				moof, _ = box.(*mp4.MoofBox)
 				moofAt = pos
 			}
+		case "uuid":
+			if size <= 1<<20 {
+				buf := make([]byte, size-head)
+				if n, _ := r.ReadAt(buf, pos+head); int64(n) < size-head {
+					return finish(idx, haveMoov) // cut short
+				}
+				if turns, ok := readTurnBox(buf); ok {
+					idx.turns = append(idx.turns, turns...)
+				}
+			}
 		case "mdat":
 			end := pos + size
 			// The whole mdat must be there: a crash can cut the last one.
@@ -158,6 +171,9 @@ func (idx *index) readMoov(mv *mp4.MoovBox) error {
 		return errors.New("recording: no video track")
 	}
 	stsd := mv.Trak.Mdia.Minf.Stbl.Stsd
+	if mv.Trak.Tkhd != nil {
+		idx.turn0 = matrixTurn(mv.Trak.Tkhd.Matrix)
+	}
 	switch {
 	case stsd.AvcX != nil && stsd.AvcX.AvcC != nil:
 		c := stsd.AvcX.AvcC
@@ -276,7 +292,11 @@ func (p *player) run(ctx context.Context, start int, from time.Duration) {
 			return false
 		}
 	}
-	if len(p.idx.params) > 0 && !send(driver.Packet{Data: annexB(p.idx.params), Config: true}) {
+	turn0 := 0
+	if start < len(p.idx.samples) {
+		turn0 = p.idx.turnAt(p.idx.samples[start].t)
+	}
+	if len(p.idx.params) > 0 && !send(driver.Packet{Data: annexB(p.idx.params), Config: true, Turn: turn0}) {
 		return
 	}
 	began := time.Now()
@@ -300,10 +320,11 @@ func (p *player) run(ctx context.Context, start int, from time.Duration) {
 			return
 		}
 		cfg, pic := p.split(buf)
-		if len(cfg) > 0 && !send(driver.Packet{Data: annexB(cfg), Config: true, PTS: at}) {
+		turn := p.idx.turnAt(s.t)
+		if len(cfg) > 0 && !send(driver.Packet{Data: annexB(cfg), Config: true, PTS: at, Turn: turn}) {
 			return
 		}
-		if len(pic) > 0 && !send(driver.Packet{Data: annexB(pic), KeyFrame: s.key, PTS: at}) {
+		if len(pic) > 0 && !send(driver.Packet{Data: annexB(pic), KeyFrame: s.key, PTS: at, Turn: turn}) {
 			return
 		}
 	}

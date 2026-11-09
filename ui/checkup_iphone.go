@@ -79,6 +79,9 @@ func (a *app) iphoneCheckWords(d gateway.DeviceView, ck driver.Check) (w checkWo
 		// Steps in the person's words say it all, except why a mount
 		// failed.
 		w.detail = ck.Fix == driver.SetupDiskImage
+		if ck.Fix == driver.SetupDiskImageRefused && refusedOffersMirror(d.Info.DiskImage) {
+			w.note = locales.CheckDiskImageRefusedNote()
+		}
 		return w, true
 	case driver.CheckDeveloperMode:
 		if pass {
@@ -217,6 +220,15 @@ func refusedWords(img driver.DiskImage) string {
 // Xcode's own image and the mirror's, on a Mac.
 func refusedNeedsXcode(img *driver.DiskImage) bool {
 	return guideOS == "darwin" && img != nil && (img.Source == driver.DiskImageFromXcode || img.Source == driver.DiskImageFromMirror)
+}
+
+// refusedOffersMirror reports whether the steps offer to download an image
+// from the third-party mirror after Apple refused img: when img came with
+// Xcode or was put in Pinky's folder. Not for the mirror's own download,
+// which says to update Xcode or Pinky, nor for PINKY_DDI's image, the only
+// one Pinky uses while it is set.
+func refusedOffersMirror(img *driver.DiskImage) bool {
+	return img != nil && (img.Source == driver.DiskImageFromXcode || img.Source == driver.DiskImageFromFolder)
 }
 
 // chooseConnection opens Settings › Phones, where an iPhone's connection

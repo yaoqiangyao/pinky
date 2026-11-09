@@ -198,7 +198,8 @@ func (g *Gateway) gate(l *lease, approvalID string, action bool) *Result {
 	g.mu.Lock()
 	d := l.dev
 	for !l.ended && g.waitMovingLocked(l.ctx, d) {
-		// It was moving between its cable and Wi-Fi (wifi.go).
+		// It was moving between its cable and Wi-Fi, or Pinky was opening
+		// it again (wifi.go).
 	}
 	switch {
 	case l.ended:
@@ -948,7 +949,7 @@ func (g *Gateway) ask(ctx context.Context, l *lease, c Call, a Action, p *prep, 
 	if res := g.afterOpen(l, info); res != nil {
 		return info, res
 	}
-	before := g.shotID(g.keepImage(l.dev, cur, shot))
+	before := g.shotID(g.keepImage(l.dev, cur, shot, false))
 	g.openStep(l, info, "phone_"+a.Tool, a.args(c), "Waiting for you: "+p.desc, target, p.point, before)
 	return info, nil
 }
@@ -1643,8 +1644,14 @@ func (g *Gateway) observeOCR(ctx context.Context, d *device, mode readOCR) (*scr
 		}
 		return nil, errors.New("the driver returned no screen")
 	}
+	// One-time codes are masked before anything else sees the read: the
+	// agent, history, approvals and refs (policy.MaskScreen).
+	g.policy.MaskScreen(s)
+	// So are blocked apps' notifications and cards on other screens
+	// (hidden.go); their notification events are matched by name too.
+	names := g.hideBlocked(ctx, d, dev, s)
 	d.refs.Assign(s)
-	evs := g.policy.FilterEvents(s.Events)
+	evs := g.policy.FilterEventsNamed(s.Events, names)
 	_, blocked := g.policy.Blocked(s.App)
 	s.Events = nil
 	g.mu.Lock()
@@ -1752,33 +1759,51 @@ var errScreenChanged = errors.New("the screen changed while the screenshot was t
 // notifications from blocked apps.
 var errLockedShot = errors.New("the phone is locked, and its lock screen can show notifications from blocked apps")
 
-// screenshot takes a screenshot of the screen s describes. It reads the
-// screen again afterwards and drops the image when the foreground app
-// changed, is blocked or unknown, or the phone locked, so a blocked app
-// that comes to the front in between is never captured.
-func (g *Gateway) screenshot(ctx context.Context, d *device, s *screen.Screen) (image.Image, error) {
+// shotCover counts the boxes a screenshot got: over one-time codes, and
+// over blocked apps' notifications and cards (hidden.go).
+type shotCover struct{ codes, hidden int }
+
+// screenshot takes a screenshot of the screen s describes, for an agent.
+// It reads the screen again afterwards and drops the image when the
+// foreground app changed, is blocked or unknown, or the phone locked, so a
+// blocked app that comes to the front in between is never captured. What
+// the reads hid of blocked apps is covered (coverHidden), and so are
+// one-time codes (coverCodes).
+func (g *Gateway) screenshot(ctx context.Context, d *device, s *screen.Screen) (img image.Image, cov shotCover, err error) {
 	dev, bg := g.screenOf(d)
 	if dev == nil {
-		return nil, driver.ErrOffline
+		return nil, cov, driver.ErrOffline
 	}
 	if s.Locked {
-		return nil, errLockedShot
+		return nil, cov, errLockedShot
 	}
 	if !recordableScreen(g.policy, s) {
-		return nil, errScreenChanged
+		return nil, cov, errScreenChanged
 	}
-	img, err := g.shotOf(ctx, d, dev, bg)
+	if _, unplaced := hiddenPlaces(1, 1, s); unplaced {
+		return nil, cov, errHiddenShot
+	}
+	img, err = g.shotOf(ctx, d, dev, bg)
 	if err != nil {
-		return nil, err
+		return nil, cov, err
 	}
 	after, err := g.observe(ctx, d, false)
 	if err != nil {
-		return nil, err
+		return nil, cov, err
 	}
 	if !recordableScreen(g.policy, after) || after.App != s.App {
-		return nil, errScreenChanged
+		return nil, cov, errScreenChanged
 	}
-	return img, nil
+	img, cov.hidden, err = coverHidden(img, s, after)
+	if err != nil {
+		return nil, shotCover{}, err
+	}
+	img, codes, ok := g.coverCodes(img, true, s, after)
+	if !ok {
+		return nil, shotCover{}, errCodeShot
+	}
+	cov.codes = codes
+	return img, cov, nil
 }
 
 // agentView hides a blocked app's screen, unless the person allowed the

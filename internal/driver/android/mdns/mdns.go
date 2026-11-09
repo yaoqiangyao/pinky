@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ type Service struct {
 	Host     string       // the SRV target, "Android_X32DXQ4S.local."
 	Port     int          // 0 until the SRV record came
 	Addrs    []netip.Addr // the host's addresses, IPv4 first
+	TXT      []string     // the instance's TXT strings ("key=value"), nil until its TXT record came
 }
 
 // Addr is where the service listens, "192.168.5.137:38161", or "" while
@@ -78,15 +80,35 @@ type Options struct {
 	Interfaces func() ([]net.Interface, error)
 	// NoGroup skips listening on the mDNS group, for tests.
 	NoGroup bool
+	// MulticastAnswers asks from port 5353 (the group socket) and without
+	// the unicast-response bit, so that responders answer to the mDNS
+	// group: a question from another port gets its answer by unicast to
+	// that port (RFC 6762 §6.7), which a firewall that lets mDNS in but
+	// nothing else (ufw's default rules) drops. Linux only: there a socket
+	// bound to the group's address sends from the interface's own; other
+	// systems ignore it.
+	MulticastAnswers bool
+	// MaxEvery, when set, spaces the rounds of questions as RFC 6762 §5.2
+	// asks of a search that runs for long: 1 s after the first, then twice
+	// as long each time, up to MaxEvery, so that the responders on the
+	// network, which all answer each round, are not woken every few
+	// seconds. The rounds start over when this computer's network
+	// addresses change. Zero keeps the quick schedule below, for searches
+	// that last seconds.
+	MaxEvery time.Duration
 	// Now is the clock; nil means time.Now.
 	Now func() time.Time
 }
 
 // The questions go out at once, then after these delays, then every
-// steadyEvery: a phone whose Wi-Fi dozes misses the first ones.
+// steadyEvery: a phone whose Wi-Fi dozes misses the first ones. With
+// Options.MaxEvery they back off instead (schedule).
 var (
 	queryDelays = []time.Duration{time.Second, time.Second, 2 * time.Second, 2 * time.Second, 4 * time.Second}
 	steadyEvery = 5 * time.Second
+	// netWatch is how often a search with Options.MaxEvery looks whether
+	// the computer's network addresses changed, to start its rounds over.
+	netWatch = 5 * time.Second
 	// followUp is how soon a service that showed up without its port or
 	// address is asked for them, at most once per followEvery.
 	followUp    = 300 * time.Millisecond
@@ -130,6 +152,9 @@ type Browser struct {
 func Browse(types []string, opt Options) (*Browser, error) {
 	if len(types) == 0 {
 		return nil, errors.New("mdns: no service types to browse")
+	}
+	if runtime.GOOS != "linux" {
+		opt.MulticastAnswers = false
 	}
 	b := &Browser{opt: opt, joined: map[int]bool{}, kick: make(chan struct{}, 1), closed: make(chan struct{})}
 	for _, t := range types {
@@ -211,23 +236,33 @@ func (b *Browser) now() time.Time {
 // service shows up without its port or address.
 func (b *Browser) run() {
 	defer b.wg.Done()
-	step := 0
+	sched := schedule{max: b.opt.MaxEvery}
 	next := time.NewTimer(0)
 	defer next.Stop()
 	var follow <-chan time.Time
 	var followed time.Time
+	var watch <-chan time.Time
+	var addrs string
+	if b.opt.MaxEvery > 0 {
+		t := time.NewTicker(netWatch)
+		defer t.Stop()
+		watch = t.C
+		addrs = b.netKey()
+	}
 	for {
 		select {
 		case <-b.closed:
 			return
 		case <-next.C:
 			b.ask(true)
-			d := steadyEvery
-			if step < len(queryDelays) {
-				d = queryDelays[step]
-				step++
+			next.Reset(sched.next())
+		case <-watch:
+			// Another network: the services there are asked for at once.
+			if k := b.netKey(); k != addrs {
+				addrs = k
+				sched.restart()
+				next.Reset(0)
 			}
-			next.Reset(d)
 		case <-b.kick:
 			// A responder that never sends the missing records is asked
 			// again by the rounds above, not in a loop.
@@ -239,6 +274,50 @@ func (b *Browser) run() {
 			b.ask(false)
 		}
 	}
+}
+
+// schedule is how long to wait after each round of questions.
+type schedule struct {
+	max   time.Duration // Options.MaxEvery; zero: queryDelays, then steadyEvery
+	step  int
+	every time.Duration // with max: the last wait
+}
+
+func (s *schedule) next() time.Duration {
+	if s.max > 0 {
+		s.every = min(max(2*s.every, time.Second), max(s.max, time.Second))
+		return s.every
+	}
+	if s.step < len(queryDelays) {
+		s.step++
+		return queryDelays[s.step-1]
+	}
+	return steadyEvery
+}
+
+// restart starts the waits over, as for a search just started.
+func (s *schedule) restart() { s.step, s.every = 0, 0 }
+
+// interfaceAddrs lists an interface's addresses; tests replace it.
+var interfaceAddrs = func(ifi *net.Interface) ([]net.Addr, error) { return ifi.Addrs() }
+
+// netKey sums up the interfaces the search uses and their addresses, which
+// change when the computer joins another network.
+func (b *Browser) netKey() string {
+	ifs, err := b.interfaces()
+	if err != nil {
+		return ""
+	}
+	var sb strings.Builder
+	for i := range ifs {
+		sb.WriteString(ifs[i].Name)
+		addrs, _ := interfaceAddrs(&ifs[i])
+		for _, a := range addrs {
+			sb.WriteString(" " + a.String())
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // ask sends one round of questions: the types (when all is set) and the
@@ -254,7 +333,7 @@ func (b *Browser) ask(all bool) {
 	if all {
 		types = b.types
 	}
-	msg, err := query(types, srv, hosts)
+	msg, err := query(types, srv, hosts, !b.opt.MulticastAnswers)
 	if err != nil {
 		b.setErr(err)
 		return
@@ -326,14 +405,18 @@ func (b *Browser) send(msg []byte) error {
 		return ErrNoNetwork
 	}
 	group := net.UDPAddrFromAddrPort(Group)
+	pc := b.upc
+	if b.opt.MulticastAnswers && b.gpc != nil {
+		pc = b.gpc
+	}
 	var first error
 	sent := false
 	for i := range ifs {
 		ifi := &ifs[i]
 		b.join(ifi)
-		err := b.upc.SetMulticastInterface(ifi)
+		err := pc.SetMulticastInterface(ifi)
 		if err == nil {
-			_, err = b.upc.WriteTo(msg, nil, group)
+			_, err = pc.WriteTo(msg, nil, group)
 		}
 		if err == nil {
 			sent = true
@@ -447,14 +530,17 @@ func (b *Browser) handle(msg []byte) {
 
 // query builds a message with questions for the types' instances (PTR),
 // the instances' SRV and TXT records and the hosts' addresses, each with
-// the unicast-response bit set (RFC 6762 §5.4).
-func query(types, instances, hosts []string) ([]byte, error) {
+// the unicast-response bit set when unicast (RFC 6762 §5.4).
+func query(types, instances, hosts []string, unicast bool) ([]byte, error) {
 	b := dnsmessage.NewBuilder(make([]byte, 0, 512), dnsmessage.Header{})
 	b.EnableCompression()
 	if err := b.StartQuestions(); err != nil {
 		return nil, err
 	}
-	qu := dnsmessage.ClassINET | unicastBit
+	qu := dnsmessage.ClassINET
+	if unicast {
+		qu |= unicastBit
+	}
 	q := func(name string, t dnsmessage.Type) error {
 		n, err := dnsmessage.NewName(name)
 		if err != nil {
@@ -496,10 +582,11 @@ type record struct {
 	target string // PTR and SRV: as sent
 	port   uint16 // SRV
 	addr   netip.Addr
+	txt    []string // TXT
 }
 
-// parse reads the PTR, SRV, A and AAAA records of an mDNS response, in
-// every section; it skips the other types (TXT, NSEC, OPT) and questions.
+// parse reads the PTR, SRV, TXT, A and AAAA records of an mDNS response,
+// in every section; it skips the other types (NSEC, OPT) and questions.
 func parse(msg []byte) ([]record, bool) {
 	var p dnsmessage.Parser
 	h, err := p.Start(msg)
@@ -547,6 +634,18 @@ func parse(msg []byte) ([]record, bool) {
 					return out, len(out) > 0
 				}
 				r.target, r.port = rr.Target.String(), rr.Port
+			case dnsmessage.TypeTXT:
+				// A TXT record that does not parse is skipped, not the
+				// rest of the message: the services' PTR, SRV and address
+				// records often come after it, and none of them needs it.
+				rr, err := p.TXTResource()
+				if err != nil {
+					if err := s.skip(); err != nil {
+						return out, len(out) > 0
+					}
+					continue
+				}
+				r.txt = rr.TXT
 			case dnsmessage.TypeA:
 				rr, err := p.AResource()
 				if err != nil {
@@ -576,6 +675,7 @@ func parse(msg []byte) ([]record, bool) {
 type cache struct {
 	ptrs  map[ptrKey]time.Time  // a type's instance, until it expires
 	srvs  map[string]srvRecord  // by the instance's full name, lower case
+	txts  map[string]txtRecord  // by the instance's full name, lower case
 	addrs map[string][]addrItem // by host name, lower case
 }
 
@@ -587,6 +687,11 @@ type ptrKey struct {
 type srvRecord struct {
 	target  string
 	port    uint16
+	expires time.Time
+}
+
+type txtRecord struct {
+	txt     []string
 	expires time.Time
 }
 
@@ -602,6 +707,7 @@ const maxHosts = 256
 func (c *cache) init() {
 	c.ptrs = map[ptrKey]time.Time{}
 	c.srvs = map[string]srvRecord{}
+	c.txts = map[string]txtRecord{}
 	c.addrs = map[string][]addrItem{}
 }
 
@@ -666,6 +772,15 @@ func (c *cache) add(now time.Time, types []string, recs []record) bool {
 			}
 			c.srvs[r.name] = srvRecord{target: r.target, port: r.port, expires: expiry(r.ttl)}
 			hosts[strings.ToLower(r.target)] = true
+		case dnsmessage.TypeTXT:
+			if inst, _ := instanceOf(r.name, types); inst == "" {
+				continue
+			}
+			if r.ttl == 0 {
+				delete(c.txts, r.name)
+				continue
+			}
+			c.txts[r.name] = txtRecord{txt: r.txt, expires: expiry(r.ttl)}
 		}
 	}
 	flushed := map[string]bool{}
@@ -708,6 +823,11 @@ func (c *cache) prune(now time.Time) {
 	for k, s := range c.srvs {
 		if !now.Before(s.expires) {
 			delete(c.srvs, k)
+		}
+	}
+	for k, t := range c.txts {
+		if !now.Before(t.expires) {
+			delete(c.txts, k)
 		}
 	}
 	for h, items := range c.addrs {
@@ -769,7 +889,11 @@ func (c *cache) services(now time.Time, types []string) []Service {
 			continue
 		}
 		svc := Service{Instance: k.instance, Type: k.typ}
-		if s, ok := c.srvs[strings.ToLower(k.instance+"."+k.typ+".local.")]; ok && now.Before(s.expires) {
+		fqdn := strings.ToLower(k.instance + "." + k.typ + ".local.")
+		if t, ok := c.txts[fqdn]; ok && now.Before(t.expires) {
+			svc.TXT = append([]string(nil), t.txt...)
+		}
+		if s, ok := c.srvs[fqdn]; ok && now.Before(s.expires) {
 			svc.Host, svc.Port = s.target, int(s.port)
 			for _, it := range c.addrs[strings.ToLower(s.target)] {
 				if now.Before(it.expires) {

@@ -122,7 +122,7 @@ func (c *Client) Diagnostics(phones []driver.Info, extra ...string) Diagnostics 
 	}
 	for _, p := range phones {
 		parts := []string{strings.TrimSpace(string(p.Platform) + " " + p.OSVersion)}
-		for _, s := range []string{p.Model, p.Connection, p.Backend, string(p.State)} {
+		for _, s := range []string{p.Model, p.Connection, p.Backend, string(p.State), wifiLine(p.WiFi)} {
 			if s = strings.TrimSpace(s); s != "" {
 				parts = append(parts, s)
 			}
@@ -131,6 +131,25 @@ func (c *Client) Diagnostics(phones []driver.Info, extra ...string) Diagnostics 
 	}
 	d.Summary = b.String()
 	return d
+}
+
+// wifiLine says what Pinky knows of an iPhone's Wi-Fi connection
+// (driver.Info.WiFi), "" for other phones: "wifi connections turned_on,
+// not seen on wifi".
+func wifiLine(w driver.WiFiConnection) string {
+	if w.Connections == "" {
+		return ""
+	}
+	s := "wifi connections " + w.Connections
+	if w.Seen {
+		s += ", seen on wifi"
+	} else {
+		s += ", not seen on wifi"
+	}
+	if w.Detail != "" {
+		s += " (" + w.Detail + ")"
+	}
+	return s
 }
 
 // readTail returns the last lines of a file, at most max bytes and lines,

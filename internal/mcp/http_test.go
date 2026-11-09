@@ -59,7 +59,7 @@ func waitIdle(t *testing.T, g *gateway.Gateway) {
 }
 
 func TestHTTP(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, func(o *gateway.Options) { o.ResumeGrace = 50 * time.Millisecond })
 	web := h.srv.HTTP("secret-token")
 	ts := httptest.NewServer(web)
 	defer ts.Close()
@@ -82,7 +82,8 @@ func TestHTTP(t *testing.T) {
 	}
 
 	// With it, a session works like one over stdio, and ends with the
-	// client: the phone is free again.
+	// client: the phone is free again once no newer session of the agent
+	// continued its task (ResumeGrace).
 	cs := httpClient(t, ts.URL, "secret-token", "codex")
 	tools, err := cs.ListTools(context.Background(), nil)
 	if err != nil || len(tools.Tools) != 14 {

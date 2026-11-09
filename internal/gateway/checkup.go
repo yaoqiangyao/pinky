@@ -48,6 +48,11 @@ func (g *Gateway) Checkup(ctx context.Context, deviceID string) (CheckupView, er
 		}
 	}
 	v.Checks = append(v.Checks, ConnectionChecks(info)...)
+	if c, ok := WiFiCheck(info); ok {
+		// Also while offline: a phone unplugged that does not show up on
+		// Wi-Fi says here why.
+		v.Checks = append(v.Checks, c)
+	}
 	if info.State != driver.StateOnline {
 		return v, nil
 	}
@@ -63,6 +68,32 @@ func (g *Gateway) Checkup(ctx context.Context, deviceID string) (CheckupView, er
 	v.Checks = append(v.Checks, cu.Checks...)
 	v.At = time.Now()
 	return v, nil
+}
+
+// WiFiCheck is the Wi-Fi item of an iPhone's or iPad's checkup, from what
+// its provider knows (Info.WiFi): whether the phone lets this computer
+// reach it over Wi-Fi, whether Pinky turned that on, and whether this
+// computer lists it on Wi-Fi now. ok is false for phones whose provider
+// does not tell.
+func WiFiCheck(info driver.Info) (driver.Check, bool) {
+	w := info.WiFi
+	if w.Connections == "" {
+		return driver.Check{}, false
+	}
+	c := driver.Check{ID: driver.CheckWiFi, Detail: w.Detail}
+	switch {
+	case info.Connection == "wifi" || w.Seen:
+		c.Status = driver.CheckPass
+	case w.Connections == driver.WiFiConnectionsOn || w.Connections == driver.WiFiConnectionsTurnedOn:
+		c.Status, c.Fix = driver.CheckWarn, driver.FixSameNetwork
+	case w.Connections == driver.WiFiConnectionsFailed:
+		c.Status, c.Fix = driver.CheckFail, driver.FixReconnect
+	case w.Connections == driver.WiFiConnectionsOff:
+		c.Status, c.Fix = driver.CheckSkip, driver.FixWiFiSetting
+	default:
+		c.Status = driver.CheckSkip
+	}
+	return c, true
 }
 
 // ConnectionChecks are the items every checkup starts with, from what the

@@ -1,8 +1,10 @@
 package ios
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -460,5 +462,84 @@ func TestWiFiAllowedOnCable(t *testing.T) {
 	list()
 	if a.count("phone") != 4 {
 		t.Fatalf("with Wi-Fi turned off: %v", a.calls)
+	}
+}
+
+// TestWiFiConnectionState: List says what Pinky knows of each phone's Wi-Fi
+// connection (Info.WiFi), and logs each change once.
+func TestWiFiConnectionState(t *testing.T) {
+	w := newWiFiProvider(entry("phone", 3, "USB"), entry("other", 4, "Network"))
+	var logs bytes.Buffer
+	w.Log = slog.New(slog.NewTextHandler(&logs, nil))
+	a := &allowCounter{calls: map[string]int{}}
+	w.wifi.allowFn = a.fn
+	w.UseOverWiFi("other")
+	state := func(id string) driver.WiFiConnection {
+		t.Helper()
+		got := listed(t, w.Provider)
+		w.wifi.allowing.Wait()
+		got = listed(t, w.Provider)
+		return got[id].WiFi
+	}
+	count := func(s string) int { return strings.Count(logs.String(), s) }
+
+	// The switch off: nothing looked at, and said why.
+	if got := state("phone"); got.Connections != driver.WiFiConnectionsOff || got.Seen || !strings.Contains(got.Detail, "is off") {
+		t.Fatalf("with Wi-Fi off: %+v", got)
+	}
+	w.SetWiFi(true)
+	if got := state("phone"); got != (driver.WiFiConnection{Connections: driver.WiFiConnectionsTurnedOn}) {
+		t.Fatalf("turned on: %+v", got)
+	}
+	state("phone")
+	if n := count("turned on Wi-Fi connections"); n != 1 {
+		t.Fatalf("logged %d times; want once:\n%s", n, logs.String())
+	}
+	if got := state("other"); got != (driver.WiFiConnection{Connections: driver.WiFiConnectionsOn, Seen: true}) {
+		t.Fatalf("a phone listed over the network: %+v", got)
+	}
+	// Seen on Wi-Fi too, then unplugged: Pinky turned them on, and it is
+	// there.
+	w.set(entry("phone", 3, "USB"), entry("phone", 9, "Network"))
+	if got := state("phone"); got != (driver.WiFiConnection{Connections: driver.WiFiConnectionsTurnedOn, Seen: true}) {
+		t.Fatalf("on both: %+v", got)
+	}
+	if count("iphone: listed over Wi-Fi") != 2 { // other, then phone
+		t.Fatalf("listing over Wi-Fi not logged:\n%s", logs.String())
+	}
+
+	// Plugged in again, the phone refuses: the reason is kept and logged.
+	a.mu.Lock()
+	a.err = errors.New("Failed setting 'EnableWifiConnections' to 'true' with err: NotAllowed")
+	a.mu.Unlock()
+	w.set(entry("phone", 12, "USB"))
+	if got := state("phone"); got.Connections != driver.WiFiConnectionsFailed || got.Seen || !strings.Contains(got.Detail, "NotAllowed") {
+		t.Fatalf("refused: %+v", got)
+	}
+	if count("could not turn on Wi-Fi connections") != 1 || count("no longer listed over Wi-Fi") != 1 {
+		t.Fatalf("logs:\n%s", logs.String())
+	}
+
+	// Not trusted yet, and not answering: not looked at, and why.
+	trusted := false
+	inspect := w.inspectFn
+	w.inspectFn = func(ctx context.Context, e goios.DeviceEntry) driver.Info {
+		info := inspect(ctx, e)
+		if !trusted {
+			return driver.Info{ID: info.ID, Platform: driver.IOS, Connection: "usb", State: driver.StateUnauthorized, Setup: driver.SetupTrust}
+		}
+		return driver.Info{ID: info.ID, Platform: driver.IOS, Connection: "usb", State: driver.StateOffline, Detail: "The iPhone does not answer: EOF"}
+	}
+	w.set(entry("phone", 13, "USB"))
+	if got := state("phone"); got.Connections != driver.WiFiConnectionsUnknown || !strings.Contains(got.Detail, "trust") {
+		t.Fatalf("not trusted: %+v", got)
+	}
+	trusted = true
+	w.set(entry("phone", 14, "USB"))
+	if got := state("phone"); got.Connections != driver.WiFiConnectionsUnknown || !strings.Contains(got.Detail, "lockdown could not be read: The iPhone does not answer") {
+		t.Fatalf("not answering: %+v", got)
+	}
+	if count("Wi-Fi connections not looked at") != 3 { // off, untrusted, no answer
+		t.Fatalf("logs:\n%s", logs.String())
 	}
 }

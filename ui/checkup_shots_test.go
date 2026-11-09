@@ -13,7 +13,7 @@ import (
 )
 
 // TestCheckupScreenshots draws Add phone's Android steps for every brand,
-// and checkups, in English and Simplified Chinese, into
+// and checkups, in each of the client's languages, into
 // $PINKY_SCREENSHOTS:
 //
 //	PINKY_SCREENSHOTS=dir go test ./ui -run TestCheckupScreenshots
@@ -23,8 +23,8 @@ func TestCheckupScreenshots(t *testing.T) {
 		t.Skip("set PINKY_SCREENSHOTS to a folder to write the screenshots")
 	}
 	dark := os.Getenv("PINKY_SCREENSHOTS_DARK") != ""
-	for _, lang := range []string{"en", "zh-Hans"} {
-		short := map[string]string{"en": "en", "zh-Hans": "zh"}[lang]
+	for _, lang := range testLanguages() {
+		short := langShort(lang)
 		shoot := func(name string, view func(*mg.Context), w, h int) {
 			t.Helper()
 			tt := mg.NewTester(view, w, h)

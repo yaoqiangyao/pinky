@@ -199,7 +199,7 @@ func put(t *testing.T, url, contentType string, body []byte) (int, string) {
 // A remote agent asks for a link and sends the file to it without the
 // agent token, once.
 func TestUploadLink(t *testing.T) {
-	h := newHarness(t, withData(t))
+	h := newHarness(t, withData(t), func(o *gateway.Options) { o.ResumeGrace = 50 * time.Millisecond })
 	web := h.srv.HTTP("tok")
 	ts := httptest.NewServer(web)
 	defer ts.Close()

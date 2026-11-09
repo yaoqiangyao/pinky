@@ -1,6 +1,7 @@
 package ios
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -80,8 +81,11 @@ type media struct {
 	ready    chan struct{}
 	isReady  bool
 	frameLog []frameMark // recent frames, for settle detection and stats
-	stats    mediaStats
-	lastFIR  time.Time // the last keyframe request
+	exts     [][]byte    // RTP header extensions seen (noteExt)
+
+	turn    atomic.Int32 // the interface's turn from the display's frame, for packets (setTurn)
+	stats   mediaStats
+	lastFIR time.Time // the last keyframe request
 }
 
 type frameMark struct {
@@ -243,6 +247,9 @@ func (m *media) receive() {
 		p, err := parseRTP(pkt)
 		if err != nil {
 			continue
+		}
+		if p.Ext != nil {
+			m.noteExt(p.Ext)
 		}
 		m.onRTP(p, n)
 	}
@@ -435,7 +442,8 @@ func (m *media) finishAU() {
 		close(m.ready)
 	}
 	cfgData := m.config
-	pkt := driver.Packet{Data: data, PTS: pts, KeyFrame: key}
+	turn := int(m.turn.Load())
+	pkt := driver.Packet{Data: data, PTS: pts, KeyFrame: key, Turn: turn}
 	for s := range m.subs {
 		if s.closed {
 			continue
@@ -444,7 +452,7 @@ func (m *media) finishAU() {
 			if !key {
 				continue
 			}
-			if !m.offer(s, driver.Packet{Data: cfgData, PTS: pts, Config: true}) {
+			if !m.offer(s, driver.Packet{Data: cfgData, PTS: pts, Config: true, Turn: turn}) {
 				continue
 			}
 			s.needKey = false
@@ -678,6 +686,32 @@ func (m *media) size() (int, int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.width, m.height
+}
+
+// setTurn sets the turn the packets carry from now on: how far the
+// interface is turned from the display's frame, which the picture is in.
+func (m *media) setTurn(q quarter) { m.turn.Store(int32(q & 3)) }
+
+// noteExt keeps the RTP header extensions the stream carried, the first
+// few different ones, for diagnostics (iosctl orient).
+func (m *media) noteExt(ext []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, e := range m.exts {
+		if bytes.Equal(e, ext) {
+			return
+		}
+	}
+	if len(m.exts) < 16 {
+		m.exts = append(m.exts, bytes.Clone(ext))
+	}
+}
+
+// headerExts returns the different RTP header extensions seen so far.
+func (m *media) headerExts() [][]byte {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([][]byte(nil), m.exts...)
 }
 
 func (m *media) snapshot() mediaStats {

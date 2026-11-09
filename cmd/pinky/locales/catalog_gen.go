@@ -9,14 +9,16 @@ import (
 	"github.com/egoist/mygo/i18n"
 
 	// MyGo's own strings in the app's languages.
+	_ "github.com/egoist/mygo/locales/ja"
 	_ "github.com/egoist/mygo/locales/zh-Hans"
 )
 
 //go:embed *.json
 var files embed.FS
 
-// Catalog holds the messages in en, the source language, and zh-Hans. It is
-// registered with package i18n, which makes its languages the app's.
+// Catalog holds the messages in en, the source language, and ja and
+// zh-Hans. It is registered with package i18n, which makes its languages
+// the app's.
 var Catalog *i18n.Catalog
 
 func init() {
@@ -1288,9 +1290,11 @@ func (msgs Messages) AddPhoneIPhoneNoImageTitle() string {
 // developer services; it comes with Xcode), as Apple does with images it no
 // longer signs, such as those of Xcode before 27: the text when the image
 // is one the person put in a folder (Pinky's own, or the one the PINKY_DDI
-// environment variable names). folder is that folder; build is the Xcode
-// build the image came with; version is the image's version, or a dash when
-// unknown. iOS_DDI is a folder name.
+// environment variable names); for Pinky's own folder, the offer to
+// download an image from a third-party mirror instead
+// (addPhoneIPhoneMirrorTitle) comes below it. folder is that folder; build
+// is the Xcode build the image came with; version is the image's version,
+// or a dash when unknown. iOS_DDI is a folder name.
 func AddPhoneIPhoneRefusedFolder(folder string, build string, version string) string {
 	return In(i18n.Locale()).AddPhoneIPhoneRefusedFolder(folder, build, version)
 }
@@ -1304,9 +1308,11 @@ func AddPhoneIPhoneRefusedFolder(folder string, build string, version string) st
 // developer services; it comes with Xcode), as Apple does with images it no
 // longer signs, such as those of Xcode before 27: the text when the image
 // is one the person put in a folder (Pinky's own, or the one the PINKY_DDI
-// environment variable names). folder is that folder; build is the Xcode
-// build the image came with; version is the image's version, or a dash when
-// unknown. iOS_DDI is a folder name.
+// environment variable names); for Pinky's own folder, the offer to
+// download an image from a third-party mirror instead
+// (addPhoneIPhoneMirrorTitle) comes below it. folder is that folder; build
+// is the Xcode build the image came with; version is the image's version,
+// or a dash when unknown. iOS_DDI is a folder name.
 func (msgs Messages) AddPhoneIPhoneRefusedFolder(folder string, build string, version string) string {
 	return Catalog.Format(msgs.locale, "addPhoneIPhoneRefusedFolder", map[string]any{"folder": folder, "build": build, "version": version})
 }
@@ -1341,7 +1347,7 @@ func (msgs Messages) AddPhoneIPhoneRefusedMirror(build string, version string) s
 	return Catalog.Format(msgs.locale, "addPhoneIPhoneRefusedMirror", map[string]any{"build": build, "version": version})
 }
 
-// AddPhoneIPhoneRefusedRetry says "Pinky tries again by itself as soon as a newer image is on this computer."
+// AddPhoneIPhoneRefusedRetry says "Pinky tries again by itself as soon as another image is on this computer."
 // in the language the app shows.
 //
 // Add phone › iPhone and the phone's checkup, under the preparation step
@@ -1352,7 +1358,7 @@ func (msgs Messages) AddPhoneIPhoneRefusedMirror(build string, version string) s
 // box.
 func AddPhoneIPhoneRefusedRetry() string { return In(i18n.Locale()).AddPhoneIPhoneRefusedRetry() }
 
-// AddPhoneIPhoneRefusedRetry says "Pinky tries again by itself as soon as a newer image is on this computer."
+// AddPhoneIPhoneRefusedRetry says "Pinky tries again by itself as soon as another image is on this computer."
 // in the language of msgs.
 //
 // Add phone › iPhone and the phone's checkup, under the preparation step
@@ -1395,8 +1401,11 @@ func (msgs Messages) AddPhoneIPhoneRefusedTitle() string {
 // Pinky found on this computer (Apple's add-on that gives a phone its
 // developer services; it comes with Xcode), as Apple does with images it no
 // longer signs, such as those of Xcode before 27: the text when the image
-// came with Xcode on this Mac. build is the Xcode build the image came
-// with; version is the image's version, or a dash when unknown.
+// came with Xcode on this Mac; below it come the App Store link
+// (addPhoneIPhoneGetXcode) and the offer to download an image from a
+// third-party mirror instead (addPhoneIPhoneMirrorTitle). build is the
+// Xcode build the image came with; version is the image's version, or a
+// dash when unknown.
 func AddPhoneIPhoneRefusedXcode(build string, version string) string {
 	return In(i18n.Locale()).AddPhoneIPhoneRefusedXcode(build, version)
 }
@@ -1409,8 +1418,11 @@ func AddPhoneIPhoneRefusedXcode(build string, version string) string {
 // Pinky found on this computer (Apple's add-on that gives a phone its
 // developer services; it comes with Xcode), as Apple does with images it no
 // longer signs, such as those of Xcode before 27: the text when the image
-// came with Xcode on this Mac. build is the Xcode build the image came
-// with; version is the image's version, or a dash when unknown.
+// came with Xcode on this Mac; below it come the App Store link
+// (addPhoneIPhoneGetXcode) and the offer to download an image from a
+// third-party mirror instead (addPhoneIPhoneMirrorTitle). build is the
+// Xcode build the image came with; version is the image's version, or a
+// dash when unknown.
 func (msgs Messages) AddPhoneIPhoneRefusedXcode(build string, version string) string {
 	return Catalog.Format(msgs.locale, "addPhoneIPhoneRefusedXcode", map[string]any{"build": build, "version": version})
 }
@@ -3535,6 +3547,34 @@ func (msgs Messages) CheckDiskImageDownloadNote() string {
 	return Catalog.Format(msgs.locale, "checkDiskImageDownloadNote", nil)
 }
 
+// CheckDiskImageRefusedNote says "Show the steps to download an image from a third-party mirror instead. Pinky tries again by itself as soon as another…"
+// in the language the app shows.
+//
+// The phone's checkup, under the developer disk image item when Apple's
+// signing server refused to sign the image that came with Xcode on this Mac
+// (addPhoneIPhoneRefusedXcode) or one the person put in Pinky's folder
+// (addPhoneIPhoneRefusedFolder): a note saying that the setup steps (the
+// button phoneSetUpIPhone) also offer to download an image from a
+// third-party mirror (addPhoneIPhoneMirrorTitle), and that Pinky tries
+// again once another image is there. Say it as checkDiskImageDownloadNote
+// does.
+func CheckDiskImageRefusedNote() string { return In(i18n.Locale()).CheckDiskImageRefusedNote() }
+
+// CheckDiskImageRefusedNote says "Show the steps to download an image from a third-party mirror instead. Pinky tries again by itself as soon as another…"
+// in the language of msgs.
+//
+// The phone's checkup, under the developer disk image item when Apple's
+// signing server refused to sign the image that came with Xcode on this Mac
+// (addPhoneIPhoneRefusedXcode) or one the person put in Pinky's folder
+// (addPhoneIPhoneRefusedFolder): a note saying that the setup steps (the
+// button phoneSetUpIPhone) also offer to download an image from a
+// third-party mirror (addPhoneIPhoneMirrorTitle), and that Pinky tries
+// again once another image is there. Say it as checkDiskImageDownloadNote
+// does.
+func (msgs Messages) CheckDiskImageRefusedNote() string {
+	return Catalog.Format(msgs.locale, "checkDiskImageRefusedNote", nil)
+}
+
 // CheckDiskImageMissing says "Not mounted, so the iPhone doesn't offer what Pinky needs."
 // in the language the app shows.
 //
@@ -4213,6 +4253,108 @@ func CheckWiFiFail() string { return In(i18n.Locale()).CheckWiFiFail() }
 // The checkup, Wi-Fi: failed.
 func (msgs Messages) CheckWiFiFail() string {
 	return Catalog.Format(msgs.locale, "checkWiFiFail", nil)
+}
+
+// CheckWiFiIPhoneFail says "Pinky couldn't turn on its Wi-Fi connection. Plug it in again to try once more, or tick “Show this iPhone when on W…"
+// in the language the app shows.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item: Pinky could not turn on
+// the phone's Wi-Fi connection (lockdown's EnableWifiConnections, Finder's
+// checkbox); the error shows under it.
+func CheckWiFiIPhoneFail() string { return In(i18n.Locale()).CheckWiFiIPhoneFail() }
+
+// CheckWiFiIPhoneFail says "Pinky couldn't turn on its Wi-Fi connection. Plug it in again to try once more, or tick “Show this iPhone when on W…"
+// in the language of msgs.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item: Pinky could not turn on
+// the phone's Wi-Fi connection (lockdown's EnableWifiConnections, Finder's
+// checkbox); the error shows under it.
+func (msgs Messages) CheckWiFiIPhoneFail() string {
+	return Catalog.Format(msgs.locale, "checkWiFiIPhoneFail", nil)
+}
+
+// CheckWiFiIPhoneNotSeen says "Its Wi-Fi connection is on, but this computer doesn't see it on Wi-Fi. Check that both are on the same Wi-Fi network:…"
+// in the language the app shows.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item: the phone's Wi-Fi
+// connection is on, but the computer's device service does not list it over
+// the network.
+func CheckWiFiIPhoneNotSeen() string { return In(i18n.Locale()).CheckWiFiIPhoneNotSeen() }
+
+// CheckWiFiIPhoneNotSeen says "Its Wi-Fi connection is on, but this computer doesn't see it on Wi-Fi. Check that both are on the same Wi-Fi network:…"
+// in the language of msgs.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item: the phone's Wi-Fi
+// connection is on, but the computer's device service does not list it over
+// the network.
+func (msgs Messages) CheckWiFiIPhoneNotSeen() string {
+	return Catalog.Format(msgs.locale, "checkWiFiIPhoneNotSeen", nil)
+}
+
+// CheckWiFiIPhoneOff says "Use iPhones and iPads over Wi-Fi is off in Settings › Phones, so Pinky leaves its Wi-Fi connection as it is."
+// in the language the app shows.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item: Pinky's Wi-Fi setting is
+// off, so it did not look at the phone's Wi-Fi connection.
+func CheckWiFiIPhoneOff() string { return In(i18n.Locale()).CheckWiFiIPhoneOff() }
+
+// CheckWiFiIPhoneOff says "Use iPhones and iPads over Wi-Fi is off in Settings › Phones, so Pinky leaves its Wi-Fi connection as it is."
+// in the language of msgs.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item: Pinky's Wi-Fi setting is
+// off, so it did not look at the phone's Wi-Fi connection.
+func (msgs Messages) CheckWiFiIPhoneOff() string {
+	return Catalog.Format(msgs.locale, "checkWiFiIPhoneOff", nil)
+}
+
+// CheckWiFiIPhoneSeen says "Its Wi-Fi connection is on, and this computer sees it on Wi-Fi: unplugged, it keeps working while it's on the same Wi…"
+// in the language the app shows.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item, while the phone is on its
+// cable and also listed over the network.
+func CheckWiFiIPhoneSeen() string { return In(i18n.Locale()).CheckWiFiIPhoneSeen() }
+
+// CheckWiFiIPhoneSeen says "Its Wi-Fi connection is on, and this computer sees it on Wi-Fi: unplugged, it keeps working while it's on the same Wi…"
+// in the language of msgs.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item, while the phone is on its
+// cable and also listed over the network.
+func (msgs Messages) CheckWiFiIPhoneSeen() string {
+	return Catalog.Format(msgs.locale, "checkWiFiIPhoneSeen", nil)
+}
+
+// CheckWiFiIPhoneTurnedOn says "Pinky turned it on when you plugged it in, as Finder's “Show this iPhone when on Wi-Fi” does."
+// in the language the app shows.
+//
+// An iPhone's or iPad's checkup, a note under the Wi-Fi item: Pinky turned
+// on the phone's Wi-Fi connection itself.
+func CheckWiFiIPhoneTurnedOn() string { return In(i18n.Locale()).CheckWiFiIPhoneTurnedOn() }
+
+// CheckWiFiIPhoneTurnedOn says "Pinky turned it on when you plugged it in, as Finder's “Show this iPhone when on Wi-Fi” does."
+// in the language of msgs.
+//
+// An iPhone's or iPad's checkup, a note under the Wi-Fi item: Pinky turned
+// on the phone's Wi-Fi connection itself.
+func (msgs Messages) CheckWiFiIPhoneTurnedOn() string {
+	return Catalog.Format(msgs.locale, "checkWiFiIPhoneTurnedOn", nil)
+}
+
+// CheckWiFiIPhoneUnknown says "Pinky turns on its Wi-Fi connection once it's plugged in and trusts this computer."
+// in the language the app shows.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item, before Pinky could look at
+// the phone's Wi-Fi connection (not plugged in since Pinky started, or not
+// trusting the computer yet).
+func CheckWiFiIPhoneUnknown() string { return In(i18n.Locale()).CheckWiFiIPhoneUnknown() }
+
+// CheckWiFiIPhoneUnknown says "Pinky turns on its Wi-Fi connection once it's plugged in and trusts this computer."
+// in the language of msgs.
+//
+// An iPhone's or iPad's checkup, the Wi-Fi item, before Pinky could look at
+// the phone's Wi-Fi connection (not plugged in since Pinky started, or not
+// trusting the computer yet).
+func (msgs Messages) CheckWiFiIPhoneUnknown() string {
+	return Catalog.Format(msgs.locale, "checkWiFiIPhoneUnknown", nil)
 }
 
 // CheckWiFiOld says "Pairing over Wi-Fi needs Android 11 or later (this phone has Android {version}). Use USB."
@@ -9979,6 +10121,22 @@ func (msgs Messages) GwStatusNeedsYou(title string) string {
 	return Catalog.Format(msgs.locale, "gwStatusNeedsYou", map[string]any{"title": title})
 }
 
+// GwStatusNotSeenOnWiFi says "Not seen on Wi-Fi"
+// in the language the app shows.
+//
+// A phone's status line: an iPhone or iPad unplugged a moment ago that this
+// computer does not see on Wi-Fi.
+func GwStatusNotSeenOnWiFi() string { return In(i18n.Locale()).GwStatusNotSeenOnWiFi() }
+
+// GwStatusNotSeenOnWiFi says "Not seen on Wi-Fi"
+// in the language of msgs.
+//
+// A phone's status line: an iPhone or iPad unplugged a moment ago that this
+// computer does not see on Wi-Fi.
+func (msgs Messages) GwStatusNotSeenOnWiFi() string {
+	return Catalog.Format(msgs.locale, "gwStatusNotSeenOnWiFi", nil)
+}
+
 // GwStatusOffline says "Offline"
 // in the language the app shows.
 //
@@ -13347,6 +13505,24 @@ func PhoneNotConnected() string { return In(i18n.Locale()).PhoneNotConnected() }
 // Reconnect link.
 func (msgs Messages) PhoneNotConnected() string {
 	return Catalog.Format(msgs.locale, "phoneNotConnected", nil)
+}
+
+// PhoneNotSeenOnWiFi says "This computer doesn't see {name} on Wi-Fi. It may be asleep (unlock it), on another Wi-Fi network, or on one that kee…"
+// in the language the app shows.
+//
+// The Phone screen of an iPhone or iPad unplugged a moment ago that this
+// computer does not see on Wi-Fi: neither the device service lists it nor
+// does the network show it. {name} is the phone's name.
+func PhoneNotSeenOnWiFi(name string) string { return In(i18n.Locale()).PhoneNotSeenOnWiFi(name) }
+
+// PhoneNotSeenOnWiFi says "This computer doesn't see {name} on Wi-Fi. It may be asleep (unlock it), on another Wi-Fi network, or on one that kee…"
+// in the language of msgs.
+//
+// The Phone screen of an iPhone or iPad unplugged a moment ago that this
+// computer does not see on Wi-Fi: neither the device service lists it nor
+// does the network show it. {name} is the phone's name.
+func (msgs Messages) PhoneNotSeenOnWiFi(name string) string {
+	return Catalog.Format(msgs.locale, "phoneNotSeenOnWiFi", map[string]any{"name": name})
 }
 
 // PhoneOffline says "{phone} is offline"
@@ -16999,14 +17175,14 @@ func (msgs Messages) SettingsPrivacyRecord() string {
 	return Catalog.Format(msgs.locale, "settingsPrivacyRecord", nil)
 }
 
-// SettingsPrivacyRecordDesc says "Used for replays in Activity. Recording pauses while a blocked app is open."
+// SettingsPrivacyRecordDesc says "Used for replays in Activity. Recording pauses while a blocked app is open; its notifications and its card in recent …"
 // in the language the app shows.
 //
 // Settings › Privacy: the line under Record the screen during tasks.
 // Activity is the page of finished tasks.
 func SettingsPrivacyRecordDesc() string { return In(i18n.Locale()).SettingsPrivacyRecordDesc() }
 
-// SettingsPrivacyRecordDesc says "Used for replays in Activity. Recording pauses while a blocked app is open."
+// SettingsPrivacyRecordDesc says "Used for replays in Activity. Recording pauses while a blocked app is open; its notifications and its card in recent …"
 // in the language of msgs.
 //
 // Settings › Privacy: the line under Record the screen during tasks.
@@ -17997,6 +18173,26 @@ func (msgs Messages) SettingsSafetyAppLabel() string {
 	return Catalog.Format(msgs.locale, "settingsSafetyAppLabel", nil)
 }
 
+// SettingsSafetyAppNoMatch says "No app on your phones is named “{name}”. Pinky blocks only that exact name: check the spelling, or pick the app f…"
+// in the language the app shows.
+//
+// Settings › Safety › Add app: a warning under the field when what the
+// person typed is not the name or package of any app on the connected
+// phones. name is what they typed.
+func SettingsSafetyAppNoMatch(name string) string {
+	return In(i18n.Locale()).SettingsSafetyAppNoMatch(name)
+}
+
+// SettingsSafetyAppNoMatch says "No app on your phones is named “{name}”. Pinky blocks only that exact name: check the spelling, or pick the app f…"
+// in the language of msgs.
+//
+// Settings › Safety › Add app: a warning under the field when what the
+// person typed is not the name or package of any app on the connected
+// phones. name is what they typed.
+func (msgs Messages) SettingsSafetyAppNoMatch(name string) string {
+	return Catalog.Format(msgs.locale, "settingsSafetyAppNoMatch", map[string]any{"name": name})
+}
+
 // SettingsSafetyAppPlaceholder says "App name or package"
 // in the language the app shows.
 //
@@ -18011,6 +18207,70 @@ func SettingsSafetyAppPlaceholder() string { return In(i18n.Locale()).SettingsSa
 // which takes the app's name or its package name, as com.example.app.
 func (msgs Messages) SettingsSafetyAppPlaceholder() string {
 	return Catalog.Format(msgs.locale, "settingsSafetyAppPlaceholder", nil)
+}
+
+// SettingsSafetyAppsLoading says "Looking for the apps on your phones…"
+// in the language the app shows.
+//
+// Settings › Safety › Add app: under the field while Pinky lists the
+// apps on the connected phones.
+func SettingsSafetyAppsLoading() string { return In(i18n.Locale()).SettingsSafetyAppsLoading() }
+
+// SettingsSafetyAppsLoading says "Looking for the apps on your phones…"
+// in the language of msgs.
+//
+// Settings › Safety › Add app: under the field while Pinky lists the
+// apps on the connected phones.
+func (msgs Messages) SettingsSafetyAppsLoading() string {
+	return Catalog.Format(msgs.locale, "settingsSafetyAppsLoading", nil)
+}
+
+// SettingsSafetyAppsMore says "{count, plural, one {# more app: type more of its name} other {# more apps: type more of the name}}"
+// in the language the app shows.
+//
+// Settings › Safety › Add app: under the apps it offers, when more apps
+// match than it shows.
+func SettingsSafetyAppsMore(count int) string { return In(i18n.Locale()).SettingsSafetyAppsMore(count) }
+
+// SettingsSafetyAppsMore says "{count, plural, one {# more app: type more of its name} other {# more apps: type more of the name}}"
+// in the language of msgs.
+//
+// Settings › Safety › Add app: under the apps it offers, when more apps
+// match than it shows.
+func (msgs Messages) SettingsSafetyAppsMore(count int) string {
+	return Catalog.Format(msgs.locale, "settingsSafetyAppsMore", map[string]any{"count": count})
+}
+
+// SettingsSafetyAppsNoPhone says "Connect a phone to pick from its apps, or type the app's exact name or package."
+// in the language the app shows.
+//
+// Settings › Safety › Add app: under the field when no connected phone
+// could list its apps.
+func SettingsSafetyAppsNoPhone() string { return In(i18n.Locale()).SettingsSafetyAppsNoPhone() }
+
+// SettingsSafetyAppsNoPhone says "Connect a phone to pick from its apps, or type the app's exact name or package."
+// in the language of msgs.
+//
+// Settings › Safety › Add app: under the field when no connected phone
+// could list its apps.
+func (msgs Messages) SettingsSafetyAppsNoPhone() string {
+	return Catalog.Format(msgs.locale, "settingsSafetyAppsNoPhone", nil)
+}
+
+// SettingsSafetyAppsOnPhones says "On your phones"
+// in the language the app shows.
+//
+// Settings › Safety › Add app: the heading of the apps on the connected
+// phones that match what is typed, which the person can click to block.
+func SettingsSafetyAppsOnPhones() string { return In(i18n.Locale()).SettingsSafetyAppsOnPhones() }
+
+// SettingsSafetyAppsOnPhones says "On your phones"
+// in the language of msgs.
+//
+// Settings › Safety › Add app: the heading of the apps on the connected
+// phones that match what is typed, which the person can click to block.
+func (msgs Messages) SettingsSafetyAppsOnPhones() string {
+	return Catalog.Format(msgs.locale, "settingsSafetyAppsOnPhones", nil)
 }
 
 // SettingsSafetyAskGroup says "When agents ask"
@@ -18061,6 +18321,24 @@ func (msgs Messages) SettingsSafetyBlock() string {
 	return Catalog.Format(msgs.locale, "settingsSafetyBlock", nil)
 }
 
+// SettingsSafetyBlockApp says "Block {name}"
+// in the language the app shows.
+//
+// Settings › Safety › Add app: the accessibility label of an app it
+// offers, which blocks it when clicked.
+func SettingsSafetyBlockApp(name string) string {
+	return In(i18n.Locale()).SettingsSafetyBlockApp(name)
+}
+
+// SettingsSafetyBlockApp says "Block {name}"
+// in the language of msgs.
+//
+// Settings › Safety › Add app: the accessibility label of an app it
+// offers, which blocks it when clicked.
+func (msgs Messages) SettingsSafetyBlockApp(name string) string {
+	return Catalog.Format(msgs.locale, "settingsSafetyBlockApp", map[string]any{"name": name})
+}
+
 // SettingsSafetyBlockedApps says "Blocked apps"
 // in the language the app shows.
 //
@@ -18077,13 +18355,13 @@ func (msgs Messages) SettingsSafetyBlockedApps() string {
 	return Catalog.Format(msgs.locale, "settingsSafetyBlockedApps", nil)
 }
 
-// SettingsSafetyBlockedIntro says "Agents can't open these apps or see their screens."
+// SettingsSafetyBlockedIntro says "Agents can't open these apps, see their screens or read their notifications."
 // in the language the app shows.
 //
 // Settings › Safety: the line under Blocked apps.
 func SettingsSafetyBlockedIntro() string { return In(i18n.Locale()).SettingsSafetyBlockedIntro() }
 
-// SettingsSafetyBlockedIntro says "Agents can't open these apps or see their screens."
+// SettingsSafetyBlockedIntro says "Agents can't open these apps, see their screens or read their notifications."
 // in the language of msgs.
 //
 // Settings › Safety: the line under Blocked apps.
@@ -18094,29 +18372,33 @@ func (msgs Messages) SettingsSafetyBlockedIntro() string {
 // SettingsSafetyHideCodes says "Hide codes from agents"
 // in the language the app shows.
 //
-// Settings › Safety: the switch that hides passwords and one-time codes
-// on the phone's screen from agents.
+// Settings › Safety: the switch that hides one-time codes, on the phone's
+// screen and in its notifications, from agents.
 func SettingsSafetyHideCodes() string { return In(i18n.Locale()).SettingsSafetyHideCodes() }
 
 // SettingsSafetyHideCodes says "Hide codes from agents"
 // in the language of msgs.
 //
-// Settings › Safety: the switch that hides passwords and one-time codes
-// on the phone's screen from agents.
+// Settings › Safety: the switch that hides one-time codes, on the phone's
+// screen and in its notifications, from agents.
 func (msgs Messages) SettingsSafetyHideCodes() string {
 	return Catalog.Format(msgs.locale, "settingsSafetyHideCodes", nil)
 }
 
-// SettingsSafetyHideCodesDesc says "One-time codes in notifications are masked before an agent reads them"
+// SettingsSafetyHideCodesDesc says "One-time codes on the screen and in notifications are masked before an agent reads them, and covered in screenshots. …"
 // in the language the app shows.
 //
-// Settings › Safety: the line under Hide codes from agents.
+// Settings › Safety: the line under Hide codes from agents. Screenshots
+// are the ones agents get and the ones Activity keeps; recordings are the
+// screen recordings of tasks, which are not covered.
 func SettingsSafetyHideCodesDesc() string { return In(i18n.Locale()).SettingsSafetyHideCodesDesc() }
 
-// SettingsSafetyHideCodesDesc says "One-time codes in notifications are masked before an agent reads them"
+// SettingsSafetyHideCodesDesc says "One-time codes on the screen and in notifications are masked before an agent reads them, and covered in screenshots. …"
 // in the language of msgs.
 //
-// Settings › Safety: the line under Hide codes from agents.
+// Settings › Safety: the line under Hide codes from agents. Screenshots
+// are the ones agents get and the ones Activity keeps; recordings are the
+// screen recordings of tasks, which are not covered.
 func (msgs Messages) SettingsSafetyHideCodesDesc() string {
 	return Catalog.Format(msgs.locale, "settingsSafetyHideCodesDesc", nil)
 }

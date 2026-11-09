@@ -40,7 +40,8 @@ type mirror struct {
 	used    int
 	closed  bool
 
-	picW, picH int     // the stream's picture size: the device's pixels
+	picW, picH int     // the stream's picture size the right way up: the device's pixels
+	turn       int     // quarter turns clockwise that put the picture upright (driver.Packet.Turn)
 	boxW, boxH float32 // the screen's size on the window, in DIPs
 
 	down      bool         // a touch is down
@@ -209,12 +210,50 @@ func (m *mirror) aspect(d gateway.DeviceView) float32 {
 }
 
 // lastPicture copies the picture the mirror shows, for a screenshot: the
-// player writes its planes again.
-func (m *mirror) lastPicture() *video.YUV {
+// player writes its planes again. turn puts it the right way up.
+func (m *mirror) lastPicture() (pic *video.YUV, turn int) {
 	if m.frame == nil || m.frame.YUV == nil {
-		return nil
+		return nil, 0
 	}
-	return m.frame.YUV.Clone()
+	return m.frame.YUV.Clone(), m.turn
+}
+
+// drawTurned draws a picture into r turned turn quarter turns clockwise,
+// which puts a phone's picture the right way up when the phone sends its
+// display as mounted (an iPhone or iPad on iOS 27; driver.Packet.Turn).
+func drawTurned(pt *mg.Painter, bm *mg.Bitmap, r mg.Rect, turn int) {
+	turn &= 3
+	if turn == 0 {
+		pt.Image(bm, r, mg.Contain)
+		return
+	}
+	cx, cy := r.X+r.W/2, r.Y+r.H/2
+	in := r
+	if turn%2 == 1 {
+		// Drawn sideways into the box turned the other way, then turned.
+		in = mg.Rect{X: cx - r.H/2, Y: cy - r.W/2, W: r.H, H: r.W}
+	}
+	pt.Transform(mg.Rotation(float32(90*turn)), cx, cy, func() { pt.Image(bm, in, mg.Contain) })
+}
+
+// toPicture turns a point of the upright picture back into the picture as
+// the stream sends it, where the phone takes touches.
+func (m *mirror) toPicture(p screen.Point) screen.Point {
+	return turnPoint(p, m.picW, m.picH, (4-m.turn&3)&3)
+}
+
+// turnPoint returns where the pixel at p of a w×h picture lands when the
+// picture turns q quarter turns clockwise.
+func turnPoint(p screen.Point, w, h, q int) screen.Point {
+	switch q & 3 {
+	case 1:
+		return screen.Point{X: h - 1 - p.Y, Y: p.X}
+	case 2:
+		return screen.Point{X: w - 1 - p.X, Y: h - 1 - p.Y}
+	case 3:
+		return screen.Point{X: p.Y, Y: w - 1 - p.X}
+	}
+	return p
 }
 
 // showPlanes shows a picture's planes in bm, made for the first one, and
@@ -292,14 +331,23 @@ func (a *app) mirrorView(c *mg.Context, m *mirror, d gateway.DeviceView, t *gate
 				}
 				m.bitmap = showPlanes(m.bitmap, f.YUV)
 				m.frame = f
-				m.picW, m.picH = f.Width, f.Height
+				w, h := f.Width, f.Height
+				if f.Turn%2 == 1 {
+					w, h = h, w
+				}
+				if m.picW > 0 && (w != m.picW || h != m.picH) {
+					// The phone turned: lay the mirror out again for the
+					// picture's new shape.
+					a.post(func() {})
+				}
+				m.picW, m.picH, m.turn = w, h, f.Turn
 			}
 			// Repaint at the stream's rate, picking up the newest
 			// picture each time, without building the view again.
 			pt.AnimationFrameRate(60)
 		}
 		if m.bitmap != nil && m.state == "playing" {
-			pt.Clip(r, radius, func() { pt.Image(m.bitmap, r, mg.Contain) })
+			pt.Clip(r, radius, func() { drawTurned(pt, m.bitmap, r, m.turn) })
 		}
 		if outline && !locked && m.picW > 0 {
 			// Clipped to the screen: targets are in screen pixels, which on
@@ -434,6 +482,7 @@ func (a *app) mirrorInput(m *mirror, d gateway.DeviceView, ev mg.InputEvent) boo
 	id := d.Info.ID
 	toDevice := m.toDevice
 	touch := func(act driver.TouchAction, pt screen.Point) {
+		pt = m.toPicture(pt)
 		a.call(id, locales.MirrorCallTouch(), func() error { return a.api.Touch(id, act, pt) })
 	}
 	key := func(k driver.Key) {
@@ -616,4 +665,26 @@ func videoLineIn(m locales.Messages, a *app) string {
 		line = m.MirrorDecoderStats(line, mr.id, dec, fmt.Sprintf("%.0f", st.FPS), st.Latency.Round(100*time.Microsecond).String())
 	}
 	return line
+}
+
+// turnRGBA turns a picture turn quarter turns clockwise.
+func turnRGBA(img *image.RGBA, turn int) *image.RGBA {
+	turn &= 3
+	if turn == 0 {
+		return img
+	}
+	w, h := img.Rect.Dx(), img.Rect.Dy()
+	tw, th := w, h
+	if turn%2 == 1 {
+		tw, th = h, w
+	}
+	out := image.NewRGBA(image.Rect(0, 0, tw, th))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			p := turnPoint(screen.Point{X: x, Y: y}, w, h, turn)
+			si, di := img.PixOffset(img.Rect.Min.X+x, img.Rect.Min.Y+y), out.PixOffset(p.X, p.Y)
+			copy(out.Pix[di:di+4], img.Pix[si:si+4])
+		}
+	}
+	return out
 }

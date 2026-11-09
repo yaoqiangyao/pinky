@@ -34,6 +34,7 @@ type Options struct {
 	HandoffTimeout  time.Duration // default 15 min
 	IdleTimeout     time.Duration // default 10 min without calls ends a lease
 	ReconnectGrace  time.Duration // default 60 s a lease survives a dropped device
+	ResumeGrace     time.Duration // default 2 min a resuming agent's closed session keeps its leases for its next one
 	SettleMax       time.Duration // default 3 s
 	PollInterval    time.Duration // default 250 ms, for settling and phone_wait_for
 	DiscoverEvery   time.Duration // default 2 s
@@ -68,6 +69,7 @@ func (o *Options) defaults() {
 	set(&o.HandoffTimeout, 15*time.Minute)
 	set(&o.IdleTimeout, 10*time.Minute)
 	set(&o.ReconnectGrace, 60*time.Second)
+	set(&o.ResumeGrace, 2*time.Minute)
 	set(&o.SettleMax, 3*time.Second)
 	set(&o.PollInterval, 250*time.Millisecond)
 	set(&o.DiscoverEvery, 2*time.Second)
@@ -90,12 +92,14 @@ type Gateway struct {
 	approvals *approval.Center
 	rec       *recorder
 
-	mu       sync.Mutex
-	devices  map[string]*device
-	sessions map[string]*Session
-	ended    []*task // recently ended tasks, newest last
-	agents   map[string]*agentState
-	apSteps  map[string]stepRef // approval id -> the step it holds
+	mu          sync.Mutex
+	devices     map[string]*device
+	sessions    map[string]*Session
+	sessionSeq  uint64       // the last Session.seq
+	resumeStops []resumeStop // recent Stops of resuming agents (resume.go)
+	ended       []*task      // recently ended tasks, newest last
+	agents      map[string]*agentState
+	apSteps     map[string]stepRef // approval id -> the step it holds
 
 	subMu sync.Mutex
 	subs  map[chan Event]struct{}
@@ -205,8 +209,11 @@ func (g *Gateway) Close() error {
 	}
 	g.mu.Unlock()
 	for _, s := range sessions {
-		s.end("gateway stopped")
+		s.end("gateway stopped", false)
 	}
+	g.mu.Lock()
+	g.endKeptLocked("gateway stopped")
+	g.mu.Unlock()
 	g.approvals.Close()
 	g.cancel()
 	// Recordings close their files, which needs the history queue.
@@ -437,7 +444,7 @@ func (g *Gateway) updateDevice(p driver.Provider, info driver.Info) *device {
 	g.mu.Lock()
 	open := info.State == driver.StateOnline && d.dev == nil && !d.opening && !d.removed
 	if open {
-		d.opening = true
+		d.opening, d.openingAt = true, time.Now()
 		if time.Now().Before(d.moving) {
 			// Back on its other connection: calls wait while it opens.
 			d.moving = time.Now().Add(moveWait)
@@ -478,6 +485,7 @@ func (g *Gateway) open(ctx context.Context, d *device, p driver.Provider) {
 	g.mu.Lock()
 	d.opening = false
 	if err != nil || g.closed || d.removed {
+		g.wakeLocked(d) // calls waiting for the open (connectWait) go on
 		g.mu.Unlock()
 		if err == nil {
 			dev.Close()

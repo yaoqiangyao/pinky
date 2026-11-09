@@ -115,8 +115,10 @@ func (t tssClient) requestTicket(params map[string]interface{}, ticketKey string
 	if err != nil {
 		return nil, err
 	}
-	// Reuse the properly-verifying client built in newTssClient. gs.apple.com
-	// serves a valid public certificate, so TLS verification stays enabled.
+	// Reuse the properly-verifying client built in newTssClient; TLS
+	// verification stays enabled. gs.apple.com chains up to Apple Root CA,
+	// which macOS and Windows trust; on Linux the ios package adds it to
+	// http.DefaultTransport (appleroot_linux.go).
 	res, err := t.h.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("requestTicket: failed to send request: %w", err)

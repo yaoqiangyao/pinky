@@ -95,7 +95,8 @@ func ffprobe(t *testing.T, path string, codec driver.Codec, frames int) {
 		name = "hevc"
 	}
 	want := name + ",96,64," + strconv.Itoa(frames)
-	if got := strings.TrimSpace(string(out)); got != want {
+	// A turned recording's side data adds an empty field at the end.
+	if got := strings.TrimRight(strings.TrimSpace(string(out)), ","); got != want {
 		t.Errorf("ffprobe: %q, want %q", got, want)
 	}
 }

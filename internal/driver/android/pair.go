@@ -106,14 +106,21 @@ func (p *Provider) ConnectWiFi(ctx context.Context, addr string) (driver.Info, e
 	if _, err := splitAddr(addr); err != nil {
 		return driver.Info{}, err
 	}
+	parent := ctx
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 	if err := p.cfg.Client.Connect(ctx, addr); err != nil {
 		return driver.Info{}, wrapErr(err)
 	}
+	offline := func() error {
+		return fmt.Errorf("android: adb connected to %s, but the phone did not come online: %w", addr, driver.ErrOffline)
+	}
 	for {
 		entries, err := p.cfg.Client.Devices(ctx)
 		if err != nil {
+			if waitRanOut(parent, ctx) {
+				return driver.Info{}, offline()
+			}
 			return driver.Info{}, wrapErr(err)
 		}
 		for _, e := range entries {
@@ -122,9 +129,31 @@ func (p *Provider) ConnectWiFi(ctx context.Context, addr string) (driver.Info, e
 			}
 		}
 		if err := sleepCtx(ctx, pairPoll); err != nil {
-			return driver.Info{}, fmt.Errorf("android: adb connected to %s, but the phone did not come online: %w", addr, driver.ErrOffline)
+			return driver.Info{}, offline()
 		}
 	}
+}
+
+// waitRanOut reports whether wait, a wait for a phone made from parent
+// with a timeout, ended by its own timeout rather than the caller's: an
+// adb request it cut then means the phone did not show up in time, as when
+// the timeout falls between two requests, not that adb failed. A slow
+// computer or adb server makes that likelier. It goes by the clock: a
+// request's connection times out at the wait's deadline, a moment before
+// wait.Err() may say so.
+func waitRanOut(parent, wait context.Context) bool {
+	now := time.Now()
+	if parent.Err() != nil {
+		return false
+	}
+	if d, ok := parent.Deadline(); ok && !now.Before(d) {
+		return false
+	}
+	if errors.Is(wait.Err(), context.DeadlineExceeded) {
+		return true
+	}
+	d, ok := wait.Deadline()
+	return ok && !now.Before(d)
 }
 
 // splitAddr checks an address and port the person typed and returns the
@@ -242,11 +271,12 @@ func pairingAddr(svcs []adb.MDNSService, name string) string {
 	return ""
 }
 
-// Close implements driver.Pairing; a Wait in progress returns.
+// Close implements driver.Pairing; a Wait in progress returns, once the
+// search is closed too.
 func (q *qrPairing) Close() error {
 	q.once.Do(func() {
-		close(q.done)
 		closeBrowse(q.own)
+		close(q.done)
 	})
 	return nil
 }
@@ -275,14 +305,24 @@ func closeBrowse(b Browse) {
 // server lists or the driver's own search found, by the phone's guid, or
 // by the address it paired from when the server reported no guid.
 func (p *Provider) connectPaired(ctx context.Context, guid, host string, own Browse) (driver.Info, error) {
+	parent := ctx
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 	c := p.cfg.Client
 	var connected string // the address the driver connected to
+	notFound := func() error {
+		if connected == "" {
+			return fmt.Errorf("android: the phone paired, but its wireless debugging service did not show up; check that Wireless debugging is still on and the phone is on the same network: %w", driver.ErrPairedNotFound)
+		}
+		return fmt.Errorf("android: the phone paired and adb connected to %s, but it did not come online: %w", connected, driver.ErrOffline)
+	}
 	start := time.Now()
 	for {
 		entries, err := c.Devices(ctx)
 		if err != nil {
+			if waitRanOut(parent, ctx) {
+				return driver.Info{}, notFound()
+			}
 			return driver.Info{}, wrapErr(err)
 		}
 		for _, e := range entries {
@@ -311,10 +351,7 @@ func (p *Provider) connectPaired(ctx context.Context, guid, host string, own Bro
 			}
 		}
 		if err := sleepCtx(ctx, pairPoll); err != nil {
-			if connected == "" {
-				return driver.Info{}, fmt.Errorf("android: the phone paired, but its wireless debugging service did not show up; check that Wireless debugging is still on and the phone is on the same network: %w", driver.ErrPairedNotFound)
-			}
-			return driver.Info{}, fmt.Errorf("android: the phone paired and adb connected to %s, but it did not come online: %w", connected, driver.ErrOffline)
+			return driver.Info{}, notFound()
 		}
 	}
 }

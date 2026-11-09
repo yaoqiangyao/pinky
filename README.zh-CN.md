@@ -2,7 +2,7 @@
 <h1 align="center">Pinky</h1>
 <p align="center"><b>让任何 AI Agent 用上你的 iPhone 和 Android 手机：Mac、Windows、Linux 都能跑，关键一步你说了算。</b></p>
 <p align="center"><a href="https://github.com/yaoqiangyao/pinky/releases/latest">下载</a> · <a href="#开始使用">开始使用</a> · <a href="#常见问题">常见问题</a> · <a href="https://discord.gg/S27b7SHjng">Discord</a></p>
-<p align="center"><a href="README.md">English</a> · 简体中文</p>
+<p align="center"><a href="README.md">English</a> · 简体中文 · <a href="README.ja.md">日本語</a></p>
 
 > **这是 flyfox 维护的 [DIYgod/pinky](https://github.com/DIYgod/pinky) 分支，只面向 Windows 和 iOS 27 及以上的 iPhone。** 这里发布的版本只有 Windows 版，不带安卓配套应用，不发送使用统计和崩溃报告，从这个仓库检查更新；「帮助 › 发送反馈…」会在这里提 issue。下文介绍的是完整的 Pinky。
 <p align="center"><img src="assets/readme/demo-zh.gif" width="760" alt="Claude Code 在短信里输入回复，Pinky 扣住「发送」这一下，等你允许后才发出去"><br><sub>在 Android 16 模拟器上真实运行的 Claude Code。Pinky 默认只在付款前询问，这次还设了发消息前也要问。</sub></p>
@@ -118,13 +118,13 @@ Pinky 会自己准备好 iPhone，「添加手机 › iPhone」会一步步带�
 2. 在 iPhone 上打开「设置 › 隐私与安全性」里的「开发者模式」：这个开关是 Pinky 让它出现的。iPhone 会重启；解锁后点「打开」，再输入锁屏密码。
 3. Pinky 把 Apple 的开发者磁盘映像挂载到 iPhone 上，然后把它列为就绪。iOS 27 的 iPhone 重启后映像还在；iOS 27 以下的 iPhone 每次重启后，只要你解锁，Pinky 都会自己重新挂载。
 
-开发者磁盘映像随 [Xcode](https://apps.apple.com/app/xcode/id497799835)（Apple 给开发者的免费应用）提供，Pinky 不自带。在 Mac 上装一次 Xcode 并打开一次：Pinky 会用它装好的映像，之后 Xcode 不用再打开。iOS 27 及以上的 iPhone 需要 Xcode 27 或更新版本的映像：Apple 的签名服务器已不再为更早的映像签名，这时「添加手机」会写明 Pinky 用的是哪个映像，以及怎么换成新的。在 Windows 和 Linux 上，把这样一台 Mac 上的 `/Library/Developer/DeveloperDiskImages/iOS_DDI` 复制到 Pinky 的文件夹里（[放在哪](docs/notes/ios.md#preparing-a-phone-without-xcode)）。两样都没有的话，「添加手机」会提出从第三方镜像 github.com/doronz88/DeveloperDiskImage 下载映像（Xcode 27.0 beta 4，32 MB，由 pymobiledevice3 的作者维护，不是 Apple），只在你点「下载」时才下载；Pinky 会按预期的校验和核对每一个文件。iOS 27 及以上，iPhone 上不会装任何应用。
+开发者磁盘映像随 [Xcode](https://apps.apple.com/app/xcode/id497799835)（Apple 给开发者的免费应用）提供，Pinky 不自带。在 Mac 上装一次 Xcode 并打开一次：Pinky 会用它装好的映像，之后 Xcode 不用再打开。iOS 27 及以上的 iPhone 需要 Xcode 27 或更新版本的映像：Apple 的签名服务器已不再为更早的映像签名，这时「添加手机」会写明 Pinky 用的是哪个映像，以及怎么换成新的。在 Windows 和 Linux 上，把这样一台 Mac 上的 `/Library/Developer/DeveloperDiskImages/iOS_DDI` 复制到 Pinky 的文件夹里（[放在哪](docs/notes/ios.md#preparing-a-phone-without-xcode)）。两样都没有，或者 Pinky 找到的映像（Xcode 的，或者复制到 Pinky 文件夹里的）被 Apple 拒签时，「添加手机」会提出从第三方镜像 github.com/doronz88/DeveloperDiskImage 下载映像（Xcode 27.0 beta 4，32 MB，由 pymobiledevice3 的作者维护，不是 Apple），只在你点「下载」时才下载；Pinky 会按预期的校验和核对每一个文件，之后就用它代替被 Apple 拒签的映像。iOS 27 及以上，iPhone 上不会装任何应用。
 
-在 iPhone 13 mini（iOS 27.0.1）上验证过：映像被卸掉后 Pinky 自己挂上 Xcode 的映像（约 1.5 秒），沿用手机上已有的映像，以及 iPhone 重启后映像还在。还没在真机上试过：下载的映像、开发者模式开关、iOS 27 以下的 iPhone，以及在 Windows 或 Linux 上连接 iPhone。
+在 iPhone 13 mini（iOS 27.0.1）上验证过：映像被卸掉后 Pinky 自己挂上 Xcode 的映像（约 1.5 秒），沿用手机上已有的映像，以及 iPhone 重启后映像还在。还没在真机上试过：下载的映像、开发者模式开关、iOS 27 以下的 iPhone，以及在 Windows 上连接 iPhone。在 Linux（Arch Linux）上，贡献者已经用 iOS 27.2 的 iPhone 和 iPad 跑通了有线和 Wi-Fi 连接，当时手机上已经有映像。
 
 #### 通过 Wi-Fi 使用 iPhone 和 iPad
 
-iPhone 或 iPad 和电脑在同一个 Wi-Fi 下，并且电脑在 Wi-Fi 上列出了它时，Pinky 也会通过 Wi-Fi 使用它。手机的 Wi-Fi 连接打开后，电脑就会列出它。你插上手机并让它信任这台电脑后，Pinky 会自己打开它的 Wi-Fi 连接：这和在「访达」里勾选在 Wi-Fi 上显示这台 iPhone 的选项（英文为 Show this iPhone when on Wi-Fi）是同一个设置，已经这样设置过的手机保持不变。这项功能默认打开；在「设置 › 手机 › 通过 Wi-Fi 使用 iPhone 和 iPad」里可以关掉，关掉不会改动手机上的这个设置（可以在「访达」里关掉）。
+iPhone 或 iPad 和电脑在同一个 Wi-Fi 下，并且电脑在 Wi-Fi 上列出了它时，Pinky 也会通过 Wi-Fi 使用它。手机的 Wi-Fi 连接打开后，电脑就会列出它。你插上手机并让它信任这台电脑后，Pinky 会自己打开它的 Wi-Fi 连接：这和在「访达」里勾选在 Wi-Fi 上显示这台 iPhone 的选项（英文为 Show this iPhone when on Wi-Fi）是同一个设置，已经这样设置过的手机保持不变。这项功能默认打开；在「设置 › 手机 › 通过 Wi-Fi 使用 iPhone 和 iPad」里可以关掉，关掉不会改动手机上的这个设置。如果拔掉线后手机没有出现在 Wi-Fi 上，它的「体检」会在「Wi-Fi」一项里说明卡在哪一步：Wi-Fi 连接有没有打开、是不是 Pinky 打开的、没能打开的原因，以及这台电脑在 Wi-Fi 上能不能看到它。
 
 - Pinky 用过的 iPhone 或 iPad 拔掉线后仍可继续使用，还是同一台手机、同样的设置：Pinky 会自己把它切到 Wi-Fi，插回线时再切回有线，Agent 的任务会继续；切换期间它的调用会等几秒。
 - Pinky 没用过的，比如家人和这台电脑配对过的 iPad，会显示为「在 Wi-Fi 上发现」。在你选择「使用」（Pinky 会通过 Wi-Fi 完成准备）或「忽略」（插上线之前它都不会再出现在列表里）之前，Pinky 只读取它的名字、型号和 iOS 版本，不做任何其他事，Agent 也看不到它。
@@ -133,7 +133,9 @@ iPhone 或 iPad 和电脑在同一个 Wi-Fi 下，并且电脑在 Wi-Fi 上列�
 
 通过 Wi-Fi 时每一步都比有线慢，截图最明显。在 iPad Pro 11 英寸（第三代，iPadOS 27.0.1）上实测，Wi-Fi 对比有线：滑动后 80 到 210 毫秒画面出现变化（有线 60 到 90 毫秒），读一次主屏幕 0.6 到 2.6 秒（0.5 到 0.6 秒），截一张图 5 秒（1 秒），视频丢包 0.2%（有线为 0）。拔掉线后，正在运行的任务约 5 秒切到 Wi-Fi；插回线后 2 到 6 秒切回有线（[详情](docs/notes/ios.md#wi-fi)）。
 
-在 Mac 上，系统的设备服务 usbmuxd 在和 Wi-Fi 上的 iPhone 的连接断过一次之后（比如手机的 Wi-Fi 关了又开），可能会把它弄丢，最长约一小时都不再找它，「访达」里也看不到。Pinky 发现你用的手机明明在网络上却不再被列出时，会显示「Wi-Fi 上找不到」，并在它的页面上提供「重启设备服务…」：你确认后，macOS 会要求输入管理员密码，所有 iPhone 和 iPad（包括插着线的）都会断开一两秒。在「终端」里运行 `sudo killall usbmuxd` 效果相同。
+在 Mac 上，系统的设备服务 usbmuxd 在和 Wi-Fi 上的 iPhone 的连接断过一次之后（比如手机的 Wi-Fi 关了又开），可能会把它弄丢，最长约一小时都不再找它，「访达」里也看不到。Pinky 发现你用的手机明明在网络上却不再被列出时，会显示「Wi-Fi 上找不到」，并在它的页面上提供「重启设备服务…」：你确认后，macOS 会要求输入管理员密码，所有 iPhone 和 iPad（包括插着线的）都会断开一两秒。在「终端」里运行 `sudo killall usbmuxd` 效果相同。刚拔线的手机，Pinky 大约 10 秒内就会给出提示；其他情况下会等一分钟，因为熄屏后醒来的手机会自己回来。拔线后这台电脑在 Wi-Fi 上完全看不到的手机，会显示「Wi-Fi 上看不到」，并说明可能的原因：手机熄屏了、连的是另一个网络或者网络会把设备互相隔开（访客网络、一些路由器）、开着 VPN，或者 Pinky 没有「本地网络」权限。
+
+在 Linux 上，系统的设备服务（`usbmuxd` 软件包）只列出插着线的 iPhone 和 iPad，所以 Pinky 会自己在 Wi-Fi 上找：它在网络上找到和这台电脑配对过的手机，直接连过去。除了 `usbmuxd`，不用另外安装或设置什么。如果你运行了一个自己就能列出 Wi-Fi 上手机的设备服务（比如 netmuxd），并带上指向它的 `USBMUXD_SOCKET_ADDRESS` 启动 Pinky，Pinky 就用它。
 
 Pinky 打开手机、或者在有线和 Wi-Fi 之间切换时，会显示「正在连接」或「正在切换到 Wi-Fi」，而不是离线。通过 Wi-Fi 时，Pinky 从实时画面识别文字，不再用截图（Wi-Fi 下截一张图约 5 秒）。没设锁屏密码的 iPhone 或 iPad 读不出“已锁定”，所以它休眠掉线后再出现时，Pinky 要等它连续在线 30 秒才连接。
 
@@ -230,7 +232,9 @@ Pinky 会发送匿名的使用统计（只有计数，比如跑了几个任务�
 <details>
 <summary><b>哪些东西 Agent 看不到？</b></summary>
 
-银行、钱包和密码管理器类 App（Pinky 自带一份名单，可以在「设置 › 安全」里添加）：Agent 拿不到它们的画面，它们的通知也会被藏起来。Agent 不能往密码框和验证码框里输入，通知里的验证码会被打码。Agent 在任务中需要用银行或钱包 App 时，Pinky 会先问你。你允许的话，Agent 在这次任务剩下的时间里可以打开和读取这个 App，你的规则在那里照样会问，Pinky 也不会留下它的截图和录屏：只有画面上才有的文字，Pinky 在内存里看一眼画面识别出来，只把文字交给 Agent，不给图。密码管理器不会提供这个选项。
+银行、钱包和密码管理器类 App（Pinky 自带一份名单，可以在「设置 › 安全」里从手机上的应用中挑选添加）：Agent 拿不到它们的画面，它们的通知也会被藏起来，下拉通知栏和锁屏上也一样。别的界面上出现被屏蔽的 App 时，比如通知栏或横幅里它的通知、最近任务里它的卡片，Agent 只会读到那里有东西被隐藏了，Agent 拿到的截图和「活动」里的截图也会用灰块遮住（录屏只存在你的电脑上，里面保持原样）。Agent 不能往密码框和验证码框里输入。Agent 在任务中需要用银行或钱包 App 时，Pinky 会先问你。你允许的话，Agent 在这次任务剩下的时间里可以打开和读取这个 App，你的规则在那里照样会问，Pinky 也不会留下它的截图和录屏：只有画面上才有的文字，Pinky 在内存里看一眼画面识别出来，只把文字交给 Agent，不给图。密码管理器不会提供这个选项。
+
+一次性验证码会在 Agent 读到之前被打码：不管是在短信、邮件、通知里还是屏幕上别的地方，「您的验证码为 482913」到 Agent 那里都是「您的验证码为 ••••••」，Agent 拿到的截图和「活动」里的截图也会用灰块把验证码遮住。价格、电话号码、日期和跟验证码无关的文字里的数字都保持原样。录屏只存在你的电脑上，也不会发给 Agent，里面的验证码保持原样。可以在「设置 › 安全 › 对智能体隐藏验证码」里关掉。
 
 </details>
 

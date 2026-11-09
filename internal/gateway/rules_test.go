@@ -5,20 +5,31 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
 
 // handEdit saves a rules file as most editors do: to a new file renamed
-// over the old one.
+// over the old one. Windows refuses to rename a file over one that anything
+// holds open, whatever it shares, also for the microseconds a look at the
+// file's size and time takes (os.Stat), and these tests look every 5 ms
+// where the app looks every 2 s: one rename in about 40 was refused ("Access
+// is denied", TestHandEditedRules 5 of 200 runs on Windows CI, 2026-11-08).
+// There it tries again, as a person whose editor said so would.
 func handEdit(t *testing.T, path, data string) {
 	t.Helper()
 	tmp := path + ".edit"
 	if err := os.WriteFile(tmp, []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	err := os.Rename(tmp, path)
+	for try := 0; err != nil && runtime.GOOS == "windows" && try < 100; try++ {
+		time.Sleep(time.Millisecond)
+		err = os.Rename(tmp, path)
+	}
+	if err != nil {
 		t.Fatal(err)
 	}
 }

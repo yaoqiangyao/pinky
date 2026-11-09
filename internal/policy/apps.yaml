@@ -68,22 +68,55 @@ finance:
     - com.bnpparibas.*
     - com.santander.*
     - es.bbva.*
+    # Chinese banks: Android package, then iOS bundle id where they differ
+    # (checked in Xiaomi's and Tencent's app stores and Apple's lookup)
     - com.icbc
     - com.icbc.iphoneclient
     - com.chinamworld.main
+    - com.ccb.ccbDemo                   # China Construction Bank (iOS)
     - com.chinamworld.bocmbci
+    - com.boc.BOCMBCI                   # Bank of China (iOS)
     - com.android.bankabc
+    - com.bankabc.iphonerelease         # Agricultural Bank of China (iOS)
     - com.bankcomm.Bankcomm
     - cmb.pb
-    - com.cmbchina.*
+    - com.cmbchina.*                    # China Merchants Bank, and its 掌上生活
     - com.ecitic.bank.mobile
+    - com.citic.mobile                  # China CITIC Bank (iOS)
     - com.cebbank.mobile.cemb
-    - com.spdb.mobilebank.per
+    - com.cebbank.ebank                 # China Everbright Bank (iOS)
+    - cn.com.spdb.mobilebank.per        # Shanghai Pudong Development Bank
+    - com.spdb.retail.bank
     - cn.com.cmbc.newmbank
+    - com.cmbc.cn.iphone                # China Minsheng Bank (iOS)
+    - com.cib.cibmb                     # Industrial Bank
+    - com.hxb.mobile.client             # Hua Xia Bank
+    - com.cgbchina.xpt                  # China Guangfa Bank
+    - com.gdb.mobilegdb
     - com.pingan.paces.ccms
+    - com.pingan.creditcard             # 平安口袋银行 (iOS)
     - com.webank.wemoney
     - com.mybank.android.phone
     - com.yitong.mbank.psbc
+    - com.psbc.mobilebank               # Postal Savings Bank of China (iOS)
+    # Chinese banks' credit card apps, whose names say no 银行
+    - com.bankcomm.maidanba             # 买单吧, Bank of Communications
+    - com.cs_credit_bank                # 发现精彩, China Guangfa Bank
+    - com.cgb.creditcard.iphone
+    - com.citiccard.mobilebank          # 动卡空间, China CITIC Bank
+    - com.citicbank.creditspace
+    - com.spdbccc.app                   # 浦大喜奔, Shanghai Pudong Development Bank
+    - spdbccc.com.cn
+    - com.cmbc.cc.mbank                 # 全民生活, China Minsheng Bank
+    - com.cmbc.mobilePhone
+    - com.ebank.creditcard              # 阳光惠生活, China Everbright Bank
+    - com.cebbank.xyk
+    - com.cib.xyk                       # 兴业生活, Industrial Bank
+    - com.HuaXiaBank.HuaCard            # 华彩生活, Hua Xia Bank
+    - com.ccb.longjiLife                # 建行生活, China Construction Bank
+    - com.icbc.elife                    # 工银e生活, ICBC
+    - com.yitong.mbank.psbc.creditcard  # 邮储信用卡, Postal Savings Bank of China
+    - com.psbc.creditcard
     - jp.co.smbc.*
     - jp.co.mufg.*
     - jp.co.rakuten_bank.*
@@ -147,6 +180,17 @@ finance:
     - Alipay
     - 支付宝
     - 云闪付
+    - 买单吧
+    - 发现精彩
+    - 动卡空间
+    - 掌上生活
+    - 浦大喜奔
+    - 全民生活
+    - 阳光惠生活
+    - 兴业生活
+    - 华彩生活
+    - 建行生活
+    - 工银e生活
     - PayPay
     - Wise
     - Revolut

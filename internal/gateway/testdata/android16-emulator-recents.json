@@ -1,0 +1,171 @@
+{
+  "display": {
+    "id": 0,
+    "width": 1080,
+    "height": 2400,
+    "density_dpi": 420,
+    "rotation": 0
+  },
+  "locked": false,
+  "secure_locked": false,
+  "windows": [
+    {
+      "id": 52,
+      "type": "system",
+      "layer": 1,
+      "bounds": [
+        0,
+        0,
+        1080,
+        128
+      ],
+      "root_ms": 0,
+      "walk_ms": 0,
+      "nodes": 0
+    },
+    {
+      "id": 50,
+      "type": "application",
+      "layer": 0,
+      "title": "Recent apps",
+      "bounds": [
+        0,
+        0,
+        1080,
+        2400
+      ],
+      "active": true,
+      "focused": true,
+      "package": "com.google.android.apps.nexuslauncher",
+      "root": {
+        "class": "android.widget.FrameLayout",
+        "bounds": [
+          0,
+          0,
+          1080,
+          2400
+        ],
+        "node": -2147455760,
+        "children": [
+          {
+            "class": "android.widget.ListView",
+            "id": "com.google.android.apps.nexuslauncher:id/overview_panel",
+            "bounds": [
+              0,
+              0,
+              1080,
+              2400
+            ],
+            "scrollable": true,
+            "node": 76899,
+            "children": [
+              {
+                "class": "android.widget.FrameLayout",
+                "id": "com.google.android.apps.nexuslauncher:id/task_view_single",
+                "bounds": [
+                  0,
+                  207,
+                  131,
+                  2006
+                ],
+                "clickable": true,
+                "focusable": true,
+                "node": 144169,
+                "children": [
+                  {
+                    "class": "android.view.View",
+                    "desc": "Chrome",
+                    "id": "com.google.android.apps.nexuslauncher:id/snapshot",
+                    "bounds": [
+                      0,
+                      375,
+                      131,
+                      2006
+                    ],
+                    "node": 145130
+                  }
+                ]
+              },
+              {
+                "class": "android.widget.FrameLayout",
+                "id": "com.google.android.apps.nexuslauncher:id/task_view_single",
+                "bounds": [
+                  173,
+                  207,
+                  907,
+                  2006
+                ],
+                "clickable": true,
+                "focusable": true,
+                "focused": true,
+                "node": 138403,
+                "children": [
+                  {
+                    "class": "android.view.View",
+                    "desc": "Settings",
+                    "id": "com.google.android.apps.nexuslauncher:id/snapshot",
+                    "bounds": [
+                      173,
+                      375,
+                      907,
+                      2006
+                    ],
+                    "node": 139364
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "class": "android.widget.TextView",
+            "text": "Select text and images to copy, share, and more",
+            "id": "com.google.android.apps.nexuslauncher:id/text",
+            "bounds": [
+              108,
+              1913,
+              972,
+              2048
+            ],
+            "node": 164350
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Screenshot",
+            "id": "com.google.android.apps.nexuslauncher:id/action_screenshot",
+            "bounds": [
+              212,
+              2069,
+              534,
+              2195
+            ],
+            "clickable": true,
+            "focusable": true,
+            "node": 79782
+          },
+          {
+            "class": "android.widget.Button",
+            "text": "Select",
+            "id": "com.google.android.apps.nexuslauncher:id/action_select",
+            "bounds": [
+              629,
+              2069,
+              867,
+              2195
+            ],
+            "clickable": true,
+            "focusable": true,
+            "node": 80743
+          }
+        ]
+      },
+      "root_ms": 0,
+      "walk_ms": 14,
+      "nodes": 9
+    }
+  ],
+  "nodes": 9,
+  "truncated": false,
+  "time": 1794154006070,
+  "took_ms": 16,
+  "windows_ms": 0
+}

@@ -14,7 +14,7 @@ import (
 // rightPanel is the column of Needs you and Tasks.
 func (a *app) rightPanel(c *mg.Context) {
 	p := pal(c)
-	mg.Scroll(c).Width(320).Shrink(0).BorderWidth(0, 0, 0, 1).BorderColor(p.line).Background(p.panel).
+	mg.Scroll(c).Width(rightPanelWidth).Shrink(0).BorderWidth(0, 0, 0, 1).BorderColor(p.line).Background(p.panel).
 		Padding(20, 16).Gap(24).Label(locales.NeedsAndTasksLabel()).Children(func() {
 		if len(a.needs) > 0 {
 			mg.Column(c).Label(locales.NeedsSection()).Children(func() {

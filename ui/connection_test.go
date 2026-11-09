@@ -69,13 +69,14 @@ func containsToast(a *app, s string) bool {
 }
 
 // TestConnectionScreenshot writes Settings › Phones with the iPhone's
-// connection choice, in English and Chinese, into $PINKY_SCREENSHOTS.
+// connection choice, in each of the client's languages, into
+// $PINKY_SCREENSHOTS.
 func TestConnectionScreenshot(t *testing.T) {
 	dir := os.Getenv("PINKY_SCREENSHOTS")
 	if dir == "" {
 		t.Skip("set PINKY_SCREENSHOTS to a folder to write the screenshots")
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		ta := newTestApp(t, fakeapi.ThreePhones)
 		ta.sync()
 		ta.page, ta.set.sec = pageSettings, secPhones

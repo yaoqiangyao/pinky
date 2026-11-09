@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -30,15 +31,15 @@ func runChild(mode, dir, process string) {
 	case "panic":
 		crashHere()
 	case "fatal":
-		m := map[int]int{}
-		for i := 0; i < 4; i++ {
-			go func() {
-				for j := 0; ; j++ {
-					m[j%64] = j
-				}
-			}()
-		}
-		time.Sleep(10 * time.Second)
+		// A fatal error the runtime cannot recover from, on one goroutine.
+		// Racing map writes, used before, now and then made two threads
+		// fail at once (a fault in the torn map and the race found), and
+		// the runtime then hung instead of exiting, with or without crash
+		// capture: about one child in a thousand, on Windows and macOS
+		// alike (TestFatalErrorBecomesAReport ran into the 10-minute
+		// timeout on Windows CI, 2026-11-08).
+		var mu sync.Mutex
+		mu.Unlock()
 	case "exit":
 		os.Exit(3) // no Stop: as if killed
 	case "clean":
@@ -142,7 +143,7 @@ func TestFatalErrorBecomesAReport(t *testing.T) {
 	found := capture(t, dir).Found()
 	// The runtime prints the message before it copies to the crash file,
 	// so the reason is the function that failed.
-	if len(found) != 1 || found[0].Reason != "fatal error in internal/runtime/maps.fatal" {
+	if len(found) != 1 || found[0].Reason != "fatal error in internal/sync.fatal" {
 		t.Fatalf("found %+v", found)
 	}
 

@@ -2,7 +2,6 @@ package policy
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -359,9 +358,18 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// FilterEvents removes notifications from blocked apps and masks digit
-// codes in the rest, as the rules file says.
+// FilterEvents removes notifications from blocked apps and masks one-time
+// codes in the rest, and in toasts and dialogs, as the rules file says.
 func (e *Engine) FilterEvents(events []screen.Event) []screen.Event {
+	return e.FilterEventsNamed(events, nil)
+}
+
+// FilterEventsNamed is FilterEvents with the display names of the apps
+// that posted the notifications: name returns an app id's name, "" when it
+// is not known, and may be nil. An app blocked by its name in Settings ›
+// Safety, or by a name that says it is a bank, is matched by it as well as
+// by its id.
+func (e *Engine) FilterEventsNamed(events []screen.Event, name func(id string) string) []screen.Event {
 	if len(events) == 0 {
 		return events
 	}
@@ -370,12 +378,10 @@ func (e *Engine) FilterEvents(events []screen.Event) []screen.Event {
 	e.mu.RUnlock()
 	out := make([]screen.Event, 0, len(events))
 	for _, ev := range events {
-		if ev.Kind == screen.EventNotification && ev.App != "" {
-			if _, blocked := e.Blocked(screen.App{ID: ev.App, Name: ev.App}); blocked {
-				continue
-			}
+		if ev.Kind == screen.EventNotification && e.NotificationBlocked(ev, name) {
+			continue
 		}
-		if mask && ev.Kind == screen.EventNotification {
+		if mask {
 			ev.Text = MaskCodes(ev.Text)
 		}
 		out = append(out, ev)
@@ -383,33 +389,30 @@ func (e *Engine) FilterEvents(events []screen.Event) []screen.Event {
 	return out
 }
 
-var codeRe = regexp.MustCompile(`(?:^|[^\d.,$€£¥₩₹])(\d{4,8}|\d{3}[ -]\d{3}|\d{4}[ -]\d{4})(?:[^\d]|$)`)
-
-// MaskCodes hides digit codes of four to eight digits in a notification
-// that talks about a code, in any supported language: "Your code is
-// 123456" becomes "Your code is ••••••".
-func MaskCodes(text string) string {
-	lower := strings.ToLower(text)
-	if !anyWord(tokenize(lower), codeWords) && !containsAny(lower, codePhrases) && !containsAny(text, cjkCodeKeywords) {
-		return text
+// NotificationBlocked reports whether a notification event comes from a
+// blocked app: by its app's id and name (name may be nil, see
+// FilterEventsNamed), or, when the driver could not tell the app, by the
+// name that starts its text the way an iPhone's banners do ("Chase, Payment
+// received").
+func (e *Engine) NotificationBlocked(ev screen.Event, name func(id string) string) bool {
+	if ev.Kind != screen.EventNotification {
+		return false
 	}
-	// Mask until nothing changes, since matches can touch.
-	for i := 0; i < 4; i++ {
-		next := codeRe.ReplaceAllStringFunc(text, func(m string) string {
-			var b strings.Builder
-			for _, r := range m {
-				if r >= '0' && r <= '9' {
-					b.WriteString("•")
-				} else {
-					b.WriteRune(r)
-				}
-			}
-			return b.String()
-		})
-		if next == text {
-			break
+	if ev.App == "" {
+		n, _, ok := strings.Cut(ev.Text, ", ")
+		if !ok {
+			return false
 		}
-		text = next
+		_, blocked := e.Blocked(screen.App{Name: strings.TrimSpace(n)})
+		return blocked
 	}
-	return text
+	// A driver that knows no id passes the app's name.
+	app := screen.App{ID: ev.App, Name: ev.App}
+	if name != nil {
+		if n := strings.TrimSpace(name(ev.App)); n != "" {
+			app.Name = n
+		}
+	}
+	_, blocked := e.Blocked(app)
+	return blocked
 }

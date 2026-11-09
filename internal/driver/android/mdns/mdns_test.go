@@ -1,10 +1,12 @@
 package mdns
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -176,7 +178,7 @@ func TestOtherTypesAndQueries(t *testing.T) {
 	now := time.Now()
 	types := []string{connectType}
 	// A query (from another computer) and another service's answer.
-	q, err := query([]string{connectType}, nil, nil)
+	q, err := query([]string{connectType}, nil, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +218,7 @@ func TestCacheFlush(t *testing.T) {
 }
 
 func TestQueryQuestions(t *testing.T) {
-	msg, err := query([]string{connectType}, []string{"adb-x._adb-tls-connect._tcp.local."}, []string{"phone.local."})
+	msg, err := query([]string{connectType}, []string{"adb-x._adb-tls-connect._tcp.local."}, []string{"phone.local."}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,6 +384,71 @@ func TestBrowseFollowUpsBounded(t *testing.T) {
 	}
 }
 
+// TestSchedule: the quick schedule for searches that last seconds, and
+// RFC 6762 §5.2's for one that runs for long: each wait twice the last, up
+// to MaxEvery, from the start again after restart.
+func TestSchedule(t *testing.T) {
+	waits := func(s *schedule, n int) []time.Duration {
+		var out []time.Duration
+		for range n {
+			out = append(out, s.next())
+		}
+		return out
+	}
+	s := schedule{}
+	if got, want := waits(&s, 7), []time.Duration{time.Second, time.Second, 2 * time.Second, 2 * time.Second, 4 * time.Second, steadyEvery, steadyEvery}; !slices.Equal(got, want) {
+		t.Errorf("quick: %v, want %v", got, want)
+	}
+	s = schedule{max: time.Minute}
+	sec := time.Second
+	if got, want := waits(&s, 9), []time.Duration{sec, 2 * sec, 4 * sec, 8 * sec, 16 * sec, 32 * sec, time.Minute, time.Minute, time.Minute}; !slices.Equal(got, want) {
+		t.Errorf("backing off: %v, want %v", got, want)
+	}
+	s.restart()
+	if got := waits(&s, 2); !slices.Equal(got, []time.Duration{sec, 2 * sec}) {
+		t.Errorf("after restart: %v", got)
+	}
+}
+
+// TestBrowseBacksOff: a long search asks once, then not again for a
+// second, and at once when the computer's network addresses change.
+func TestBrowseBacksOff(t *testing.T) {
+	f := newResponder(t) // it answers nothing for this type: no follow-ups
+	oldWatch, oldAddrs := netWatch, interfaceAddrs
+	var mu sync.Mutex
+	addr := "192.168.1.10/24"
+	netWatch = 20 * time.Millisecond
+	interfaceAddrs = func(*net.Interface) ([]net.Addr, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		_, n, _ := net.ParseCIDR(addr)
+		return []net.Addr{n}, nil
+	}
+	defer func() { netWatch, interfaceAddrs = oldWatch, oldAddrs }()
+	b, err := Browse([]string{"_other._tcp"}, Options{Dest: f.addr(), MaxEvery: time.Hour,
+		Interfaces: func() ([]net.Interface, error) { return []net.Interface{{Index: 1, Name: "wlan0"}}, nil }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	messages := func() int {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return f.messages
+	}
+	time.Sleep(400 * time.Millisecond)
+	if n := messages(); n != 1 {
+		t.Fatalf("%d rounds in 0.4 s, want 1", n)
+	}
+	mu.Lock()
+	addr = "10.0.0.7/24"
+	mu.Unlock()
+	time.Sleep(400 * time.Millisecond)
+	if n := messages(); n != 2 {
+		t.Errorf("%d rounds 0.4 s after the network changed, want 2", n)
+	}
+}
+
 // TestBrowseNoNetwork reports a search without interfaces.
 func TestBrowseNoNetwork(t *testing.T) {
 	b, err := Browse([]string{connectType}, Options{NoGroup: true,
@@ -434,5 +501,119 @@ func TestEchoCheck(t *testing.T) {
 	}
 	if err := b.Err(); err != nil {
 		t.Errorf("after the echo: %v", err)
+	}
+}
+
+func TestTXT(t *testing.T) {
+	const typ = "_apple-mobdev2._tcp"
+	inst := "fa:df:90:f6:dd:2a@fe80::f8df:90ff:fef6:dd2a-supportsRP-26." + typ + ".local."
+	b := dnsmessage.NewBuilder(nil, dnsmessage.Header{Response: true, Authoritative: true})
+	b.EnableCompression()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(b.StartAnswers())
+	must(b.PTRResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(typ + ".local."), Class: dnsmessage.ClassINET, TTL: 4500},
+		dnsmessage.PTRResource{PTR: dnsmessage.MustNewName(inst)}))
+	must(b.StartAdditionals())
+	must(b.TXTResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(inst), Class: dnsmessage.ClassINET | unicastBit, TTL: 4500},
+		dnsmessage.TXTResource{TXT: []string{"identifier=abc", "authTag=AAAAAAAAAAA="}}))
+	must(b.SRVResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(inst), Class: dnsmessage.ClassINET | unicastBit, TTL: 120},
+		dnsmessage.SRVResource{Target: dnsmessage.MustNewName("iphone.local."), Port: 32498}))
+	must(b.AResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName("iphone.local."), Class: dnsmessage.ClassINET | unicastBit, TTL: 120},
+		dnsmessage.AResource{A: [4]byte{192, 168, 33, 187}}))
+	msg, err := b.Finish()
+	must(err)
+
+	c := newCache()
+	now := time.Now()
+	addMsg(t, c, now, []string{typ}, msg)
+	svcs := c.services(now, []string{typ})
+	if len(svcs) != 1 || strings.Join(svcs[0].TXT, "|") != "identifier=abc|authTag=AAAAAAAAAAA=" || svcs[0].Addr() != "192.168.33.187:32498" {
+		t.Fatalf("services = %+v", svcs)
+	}
+	if svcs := c.services(now.Add(4501*time.Second), []string{typ}); len(svcs) != 0 {
+		t.Errorf("after the TTLs: %+v", svcs)
+	}
+
+	// A goodbye for the TXT record drops it, and the service stays.
+	bye := response(t, nil, []rr{{name: inst, typ: dnsmessage.TypeTXT, ttl: 0, data: "identifier=abc"}})
+	addMsg(t, c, now, []string{typ}, bye)
+	if svcs := c.services(now, []string{typ}); len(svcs) != 1 || svcs[0].TXT != nil {
+		t.Errorf("after the goodbye: %+v", svcs)
+	}
+}
+
+// TestBadTXT: a TXT record that does not parse is skipped, and the records
+// after it in the same response still count, as before TXT records were
+// read at all.
+func TestBadTXT(t *testing.T) {
+	const typ = "_apple-mobdev2._tcp"
+	inst := "fa:df:90:f6:dd:2a@fe80::f8df:90ff:fef6:dd2a-supportsRP-26." + typ + ".local."
+	b := dnsmessage.NewBuilder(nil, dnsmessage.Header{Response: true, Authoritative: true})
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(b.StartAnswers())
+	must(b.PTRResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(typ + ".local."), Class: dnsmessage.ClassINET, TTL: 4500},
+		dnsmessage.PTRResource{PTR: dnsmessage.MustNewName(inst)}))
+	must(b.StartAdditionals())
+	must(b.TXTResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(inst), Class: dnsmessage.ClassINET, TTL: 4500},
+		dnsmessage.TXTResource{TXT: []string{"identifier=abc"}}))
+	must(b.SRVResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName(inst), Class: dnsmessage.ClassINET, TTL: 120},
+		dnsmessage.SRVResource{Target: dnsmessage.MustNewName("iphone.local."), Port: 32498}))
+	must(b.AResource(dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName("iphone.local."), Class: dnsmessage.ClassINET, TTL: 120},
+		dnsmessage.AResource{A: [4]byte{192, 168, 33, 187}}))
+	msg, err := b.Finish()
+	must(err)
+	// The TXT string's length byte says more than the record holds.
+	i := bytes.Index(msg, []byte("\x0eidentifier=abc"))
+	if i < 0 {
+		t.Fatal("no TXT string in the message")
+	}
+	msg[i] = 0x40
+
+	recs, ok := parse(msg)
+	if !ok {
+		t.Fatal("parse gave up")
+	}
+	var types []dnsmessage.Type
+	for _, r := range recs {
+		types = append(types, r.typ)
+	}
+	if want := []dnsmessage.Type{dnsmessage.TypePTR, dnsmessage.TypeSRV, dnsmessage.TypeA}; !slices.Equal(types, want) {
+		t.Fatalf("records %v, want %v", types, want)
+	}
+	c := newCache()
+	now := time.Now()
+	addMsg(t, c, now, []string{typ}, msg)
+	if svcs := c.services(now, []string{typ}); len(svcs) != 1 || svcs[0].TXT != nil || svcs[0].Addr() != "192.168.33.187:32498" {
+		t.Fatalf("services = %+v", svcs)
+	}
+}
+
+func TestQueryMulticastAnswers(t *testing.T) {
+	msg, err := query([]string{connectType}, []string{"adb-x._adb-tls-connect._tcp.local."}, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p dnsmessage.Parser
+	if _, err := p.Start(msg); err != nil {
+		t.Fatal(err)
+	}
+	qs, err := p.AllQuestions()
+	if err != nil || len(qs) != 2 {
+		t.Fatal(qs, err)
+	}
+	for _, q := range qs {
+		if q.Class != dnsmessage.ClassINET {
+			t.Errorf("%v asks for a unicast answer", q)
+		}
 	}
 }

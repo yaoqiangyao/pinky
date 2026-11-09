@@ -16,6 +16,7 @@
 //	iosctl [-udid U] launch APP
 //	iosctl [-udid U] apps
 //	iosctl [-udid U] locked
+//	iosctl [-udid U] orient [-out /tmp/pinky-orient] [-seconds 3]
 //	iosctl -wda http://127.0.0.1:8100 [-mjpeg http://127.0.0.1:9100] observe|tap|...
 //	iosctl -udid U -connection wda|coredevice|auto observe|tap|...|unlock
 //
@@ -93,6 +94,11 @@ commands:
   launch APP                    open an app by bundle id or name
   apps                          list installed apps
   locked                        report whether the phone needs its passcode
+  orient [-out DIR] [-seconds 3]
+                                what the phone says about its orientation: the
+                                display info, the app's frame, a few elements,
+                                Observe's screen, and a screenshot and video in
+                                DIR (keep it under /tmp/pinky-*)
 `)
 }
 
@@ -153,10 +159,12 @@ func run(ctx context.Context, cmd, udid string, args []string) error {
 	case "tap":
 		fs := flag.NewFlagSet("tap", flag.ContinueOnError)
 		long := fs.Bool("long", false, "long press")
+		after := fs.Duration("after", 0, "wait this long after the session opens")
 		pts, err := ints(fs, args, 2)
 		if err != nil {
 			return err
 		}
+		time.Sleep(*after)
 		return d.Tap(ctx, screen.Point{X: pts[0], Y: pts[1]}, driver.TapOptions{LongPress: *long})
 	case "swipe":
 		fs := flag.NewFlagSet("swipe", flag.ContinueOnError)
@@ -223,6 +231,8 @@ func run(ctx context.Context, cmd, udid string, args []string) error {
 		return nil
 	case "stream":
 		return stream(ctx, d, args)
+	case "orient":
+		return orient(ctx, d, args)
 	case "latency":
 		return latency(ctx, d, args)
 	case "screenshot":
@@ -619,6 +629,7 @@ func stream(ctx context.Context, d *pios.Device, args []string) error {
 	w, h := s.Size()
 	fmt.Printf("codec %s, %dx%d\n", s.Codec(), w, h)
 	var frames, keys, configs int
+	turns := map[int]int{} // packets by the turn they carry
 	var bytes int64
 	var first, last time.Duration
 	sizes := []int{}
@@ -637,6 +648,7 @@ loop:
 			if f != nil {
 				f.Write(p.Data)
 			}
+			turns[p.Turn]++
 			if p.Config {
 				configs++
 				continue
@@ -670,6 +682,7 @@ loop:
 	st, _ := d.StreamStats()
 	fmt.Printf("%d frames in %v: %.1f fps by arrival, %.1f fps by timestamp; %d keyframes, %d config packets\n",
 		frames, el.Round(time.Millisecond), float64(frames)/el.Seconds(), float64(frames-1)/(last-first).Seconds(), keys, configs)
+	fmt.Printf("packets by turn (quarter turns clockwise to upright): %v\n", turns)
 	fmt.Printf("%.2f Mbit/s, median frame %d bytes; since the session started: %d packets lost, %d frames dropped, %d keyframe requests\n",
 		float64(bytes)*8/el.Seconds()/1e6, med, st.Lost, st.Dropped, st.KeyRequests)
 	if st.DelayKnown {
@@ -702,6 +715,70 @@ func latency(ctx context.Context, d *pios.Device, args []string) error {
 	if len(lat) > 0 {
 		fmt.Printf("touch-down to first changed frame: median %v (min %v, max %v)\n",
 			lat[len(lat)/2].Round(time.Millisecond), lat[0].Round(time.Millisecond), lat[len(lat)-1].Round(time.Millisecond))
+	}
+	return nil
+}
+
+// orient prints what the phone says about its screen's orientation and
+// saves a screenshot and a few seconds of video next to it, to compare the
+// frames each one uses.
+func orient(ctx context.Context, d *pios.Device, args []string) error {
+	fs := flag.NewFlagSet("orient", flag.ContinueOnError)
+	out := fs.String("out", "/tmp/pinky-orient", "folder for the screenshot and the video")
+	secs := fs.Int("seconds", 3, "seconds of video")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(*out, 0o700); err != nil {
+		return err
+	}
+	r, err := d.Orientation(ctx)
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(r.Display))
+	for k := range r.Display {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	fmt.Println("display:")
+	for _, k := range keys {
+		fmt.Printf("  %s: %v\n", k, r.Display[k])
+	}
+	if r.RAXErr != nil {
+		fmt.Println("remoteAXService:", r.RAXErr)
+	}
+	fmt.Printf("app %q: frame %v, orientation %v\n", r.App, r.AppAttrs[21], r.AppAttrs[129])
+	for _, e := range r.Elements {
+		fmt.Printf("  %-40q x %.0f y %.0f w %.0f h %.0f\n", e.Label, e.X, e.Y, e.W, e.H)
+	}
+	b, err := d.ScreenshotPNG(ctx)
+	if err != nil {
+		return err
+	}
+	shot := *out + "/shot.png"
+	if err := os.WriteFile(shot, b, 0o600); err != nil {
+		return err
+	}
+	if cfg, err := png.DecodeConfig(strings.NewReader(string(b))); err == nil {
+		fmt.Printf("screenshot %dx%d: %s\n", cfg.Width, cfg.Height, shot)
+	}
+	if scr, err := d.Observe(ctx, driver.ObserveOptions{}); err != nil {
+		fmt.Println("observe:", err)
+	} else {
+		fmt.Printf("observe: %dx%d %s, %d elements\n", scr.Width, scr.Height, scr.Orientation, len(scr.Elements))
+		for i, e := range scr.Elements {
+			if i == 8 {
+				break
+			}
+			fmt.Printf("  %-40q %v\n", e.Label, e.Bounds)
+		}
+	}
+	if err := stream(ctx, d, []string{"-seconds", strconv.Itoa(*secs), "-out", *out + "/video.hevc"}); err != nil {
+		return err
+	}
+	for _, e := range d.HeaderExtensions() {
+		fmt.Printf("RTP header extension % x\n", e)
 	}
 	return nil
 }

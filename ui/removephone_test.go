@@ -209,9 +209,9 @@ func TestRemovePhoneChinese(t *testing.T) {
 
 // TestRemovePhoneScreenshots draws the Remove phone dialog into
 // $PINKY_SCREENSHOTS, for the notes: a phone on a cable with a task, one
-// offline, one over Wi-Fi, in English and Chinese, light and dark, and the
-// entry points (the ⋯ menu, an offline phone's page, a tile in All phones,
-// Settings › Phones). The fake's phones show no picture.
+// offline, one over Wi-Fi, in each of the client's languages, light and
+// dark, and the entry points (the ⋯ menu, an offline phone's page, a tile in
+// All phones, Settings › Phones). The fake's phones show no picture.
 func TestRemovePhoneScreenshots(t *testing.T) {
 	dir := os.Getenv("PINKY_SCREENSHOTS")
 	if dir == "" {
@@ -238,11 +238,8 @@ func TestRemovePhoneScreenshots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
-		suffix := "-en"
-		if lang != "en" {
-			suffix = "-zh"
-		}
+	for _, lang := range testLanguages() {
+		suffix := "-" + langShort(lang)
 		inLanguage(t, lang)
 		ta := newTestApp(t, fakeapi.ThreePhones)
 		ta.waitFor(t, "the lunch task", func() bool { return ta.taskOf("pixel-9") != nil })

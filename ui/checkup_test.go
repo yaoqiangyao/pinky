@@ -359,3 +359,37 @@ func TestCheckupHostWords(t *testing.T) {
 		t.Errorf("the host item is not first: %+v", got)
 	}
 }
+
+// TestIPhoneWiFiText: the iPhone's Wi-Fi item says where its Wi-Fi
+// connection stands, as gateway.WiFiCheck graded it.
+func TestIPhoneWiFiText(t *testing.T) {
+	for _, c := range []struct {
+		info driver.Info
+		want string
+	}{
+		{driver.Info{Platform: driver.IOS, Connection: "wifi", WiFi: driver.WiFiConnection{Connections: driver.WiFiConnectionsOn, Seen: true}}, locales.CheckConnectionWiFi()},
+		{driver.Info{Platform: driver.IOS, Connection: "usb", WiFi: driver.WiFiConnection{Connections: driver.WiFiConnectionsTurnedOn, Seen: true}}, locales.CheckWiFiIPhoneSeen()},
+		{driver.Info{Platform: driver.IOS, Connection: "usb", WiFi: driver.WiFiConnection{Connections: driver.WiFiConnectionsOn}}, locales.CheckWiFiIPhoneNotSeen()},
+		{driver.Info{Platform: driver.IOS, Connection: "usb", WiFi: driver.WiFiConnection{Connections: driver.WiFiConnectionsFailed, Detail: "no answer"}}, locales.CheckWiFiIPhoneFail()},
+		{driver.Info{Platform: driver.IOS, Connection: "usb", WiFi: driver.WiFiConnection{Connections: driver.WiFiConnectionsOff}}, locales.CheckWiFiIPhoneOff()},
+		{driver.Info{Platform: driver.IOS, Connection: "usb", WiFi: driver.WiFiConnection{Connections: driver.WiFiConnectionsUnknown}}, locales.CheckWiFiIPhoneUnknown()},
+	} {
+		ck, ok := gateway.WiFiCheck(c.info)
+		if !ok {
+			t.Fatalf("no Wi-Fi item for %+v", c.info.WiFi)
+		}
+		if got := iphoneWiFiText(gateway.DeviceView{Info: c.info}, ck); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.info.WiFi, got, c.want)
+		}
+	}
+}
+
+// TestNotSeenOnWiFiWords: the status line and the Phone screen of an iPhone
+// not seen on Wi-Fi.
+func TestNotSeenOnWiFiWords(t *testing.T) {
+	d := gateway.DeviceView{Status: gateway.DeviceOffline, StatusLine: "Not seen on Wi-Fi",
+		Info: driver.Info{Name: "Ada's iPhone", Platform: driver.IOS, State: driver.StateOffline, Setup: driver.SetupNotOnWiFi}}
+	if got := networkOfflineText(d); got != locales.PhoneNotSeenOnWiFi("Ada's iPhone") || !strings.Contains(got, "VPN") {
+		t.Fatalf("Phone screen: %q", got)
+	}
+}

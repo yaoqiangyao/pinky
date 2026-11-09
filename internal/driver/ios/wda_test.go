@@ -495,3 +495,32 @@ func TestFrameSettle(t *testing.T) {
 		t.Errorf("endless motion: settled %v after %v, want false at the limit", ok, took)
 	}
 }
+
+// An iPad's Settings in a split view, as WDA gave it on the iPad Simulator
+// (iPadOS 26.5) on General › Keyboards: the sidebar's bar first, holding
+// the search field and its Dictate button, then the page's bar with its
+// back button past the screen's left third.
+const wdaSplitViewTree = `{"type":"Application","label":"Settings","isVisible":"1","rect":{"x":0,"y":0,"width":834,"height":1210},"children":[
+ {"type":"NavigationBar","name":"Settings","isVisible":"1","rect":{"x":10,"y":32,"width":320,"height":114},"children":[
+  {"type":"SearchField","name":"Search","label":"Search","isVisible":"1","rect":{"x":26,"y":87,"width":288,"height":44},"children":[
+   {"type":"Button","name":"Dictate","label":"Dictate","rawIdentifier":"Dictate","isVisible":"1","rect":{"x":281,"y":98,"width":17,"height":22}}]}]},
+ {"type":"NavigationBar","name":"Keyboards","isVisible":"1","rect":{"x":0,"y":32,"width":834,"height":54},"children":[
+  {"type":"Button","name":"BackButton","label":"General","rawIdentifier":"BackButton","isVisible":"1","rect":{"x":350,"y":32,"width":44,"height":44}},
+  {"type":"StaticText","name":"Keyboards","label":"Keyboards","isVisible":"1","rect":{"x":544,"y":43,"width":86,"height":22}}]}]}`
+
+func TestBackButtonSplitView(t *testing.T) {
+	var root wdaNode
+	if err := json.Unmarshal([]byte(wdaSplitViewTree), &root); err != nil {
+		t.Fatal(err)
+	}
+	p, ok := backButton(&root, 2)
+	if !ok || p != (screen.Point{X: 744, Y: 108}) {
+		t.Fatalf("back button %v %v, want the page's at 744,108", p, ok)
+	}
+	// Without a BackButton, the sidebar's Dictate button is still not it
+	// (it is in the search field): Back then swipes from the edge.
+	root.Children[1].Children[0].Name, root.Children[1].Children[0].Identifier = nil, nil
+	if p, ok = backButton(&root, 2); ok {
+		t.Fatalf("leading button %v", p)
+	}
+}

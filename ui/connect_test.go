@@ -350,8 +350,8 @@ func TestTasksSayNoAgent(t *testing.T) {
 }
 
 // TestAgentSetupScreenshots draws Settings › Agents › Connect an agent and
-// the sidebar's card, in English and Chinese, into $PINKY_SCREENSHOTS, to
-// look for text that is cut or overflows.
+// the sidebar's card, in each of the client's languages, into
+// $PINKY_SCREENSHOTS, to look for text that is cut or overflows.
 func TestAgentSetupScreenshots(t *testing.T) {
 	dir := os.Getenv("PINKY_SCREENSHOTS")
 	if dir == "" {
@@ -373,7 +373,7 @@ func TestAgentSetupScreenshots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		inLanguage(t, lang)
 		list := someAgents()
 		list = append(list[:3:3], agents.Status{ID: "windsurf", Name: "Windsurf", Found: true,

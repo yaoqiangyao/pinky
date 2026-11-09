@@ -171,17 +171,17 @@ func TestShotLayout(t *testing.T) {
 }
 
 // TestApprovalPanelFits draws the floating panel for each kind of
-// screenshot, in English and Chinese, with short and long words: the
-// countdown, the buttons and More options stay in the window, and the
+// screenshot, in each of the client's languages, with short and long words:
+// the countdown, the buttons and More options stay in the window, and the
 // screenshot keeps a useful size.
 func TestApprovalPanelFits(t *testing.T) {
-	for _, lang := range []string{"en", "zh-Hans"} {
+	for _, lang := range testLanguages() {
 		for _, sc := range shotCases {
 			for _, long := range []bool{false, true} {
 				name := fmt.Sprintf("%s/%s/long=%v", lang, sc.name, long)
 				t.Run(name, func(t *testing.T) {
 					inLanguage(t, lang)
-					n := sc.need(t, "ap-1", lang != "en", long)
+					n := sc.need(t, "ap-1", lang == "zh-Hans", long)
 					ta := shotApp(t, n)
 					if sc.name == "locked" {
 						ta.devices[0].Status = gateway.DeviceLocked
@@ -199,8 +199,9 @@ func TestApprovalPanelFits(t *testing.T) {
 						}
 					}
 					countdown := ""
+					around := strings.SplitN(locales.PanelDeniesIn("\x00"), "\x00", 2)
 					for _, s := range tt.Texts() {
-						if strings.Contains(s, "Denies in") || strings.Contains(s, "后自动拒绝") {
+						if len(around) == 2 && strings.HasPrefix(s, around[0]) && strings.HasSuffix(s, around[1]) {
 							countdown = s
 						}
 					}
@@ -339,9 +340,9 @@ func deviceInfo(id, name string) driver.Info {
 
 // TestApprovalShotScreenshots draws the approval card with its screenshot
 // into $PINKY_SCREENSHOTS, for the notes: the floating panel for each kind
-// of screenshot in English and Chinese, light and dark, its answer, the
-// large view, and a Needs you card. The phone screens are drawn by the
-// test, not taken from a phone.
+// of screenshot in each of the client's languages, light and dark, its
+// answer, the large view, and a Needs you card. The phone screens are drawn
+// by the test, not taken from a phone.
 func TestApprovalShotScreenshots(t *testing.T) {
 	dir := os.Getenv("PINKY_SCREENSHOTS")
 	if dir == "" {
@@ -368,12 +369,9 @@ func TestApprovalShotScreenshots(t *testing.T) {
 		tt.Frame()
 		write(name, tt.Image())
 	}
-	for _, lang := range []string{"en", "zh-Hans"} {
-		zh := lang != "en"
-		suffix := "-en"
-		if zh {
-			suffix = "-zh"
-		}
+	for _, lang := range testLanguages() {
+		zh := lang == "zh-Hans"
+		suffix := "-" + langShort(lang)
 		for _, sc := range shotCases {
 			inLanguage(t, lang)
 			n := sc.need(t, "ap-1", zh, false)

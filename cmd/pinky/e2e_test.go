@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -452,6 +453,52 @@ func TestDaemonServesHTTP(t *testing.T) {
 	if text, _ := c.call(t, "phone_release", map[string]any{}); !strings.HasPrefix(text, "settled") {
 		t.Fatalf("release:\n%s", text)
 	}
+
+	// A client that sends fixed headers only, as Grok Bot does (GitHub
+	// DIYgod/pinky#10): no request after initialize carries the session
+	// id, and its GET stream has none either. It still works through a
+	// task on the iPhone.
+	idless := func(msg string) (int, string) {
+		req, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(msg))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("User-Agent", "GrokBot/1.0")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var b bytes.Buffer
+		b.ReadFrom(resp.Body)
+		return resp.StatusCode, b.String()
+	}
+	if code, body := idless(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"grok","version":"1"}}}`); code != http.StatusOK {
+		t.Fatalf("initialize: %d %s", code, body)
+	}
+	if code, _ := idless(`{"jsonrpc":"2.0","method":"notifications/initialized"}`); code != http.StatusAccepted {
+		t.Fatalf("initialized: %d", code)
+	}
+	get, _ := http.NewRequest(http.MethodGet, url, nil)
+	get.Header.Set("Accept", "text/event-stream")
+	get.Header.Set("Authorization", "Bearer "+token)
+	if resp, err := http.DefaultClient.Do(get); err != nil || resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET without a session: %v %v", resp, err)
+	} else {
+		resp.Body.Close()
+	}
+	for i, call := range []struct{ args, want string }{
+		{`{"name":"phone_connect","arguments":{"device":"iPhone 17 (fake)","task":"Open a folder"}}`, `settled · iPhone 17 (fake)`},
+		{`{"name":"phone_launch","arguments":{"app":"Dinely"}}`, `settled · iPhone 17 (fake)`},
+		{`{"name":"phone_observe","arguments":{}}`, `settled · iPhone 17 (fake)`},
+		{`{"name":"phone_release","arguments":{"summary":"Done"}}`, `Released iPhone 17 (fake)`},
+	} {
+		code, body := idless(fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":%s}`, i+2, call.args))
+		if code != http.StatusOK || !strings.Contains(body, call.want) || strings.Contains(body, `"isError":true`) {
+			t.Fatalf("call %d without a session id: %d\n%s", i, code, body)
+		}
+	}
+
 	// Without the token: refused.
 	resp, err = http.Post(url, "application/json", strings.NewReader(`{}`))
 	if err != nil {

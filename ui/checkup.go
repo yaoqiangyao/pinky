@@ -211,6 +211,24 @@ func (a *app) checkupList(c *mg.Context, d gateway.DeviceView, run *checkupRun, 
 	}
 }
 
+// iphoneWiFiText says what an iPhone's Wi-Fi item found.
+func iphoneWiFiText(d gateway.DeviceView, ck driver.Check) string {
+	switch {
+	case ck.Status == driver.CheckPass && d.Info.Connection == "wifi":
+		return locales.CheckConnectionWiFi()
+	case ck.Status == driver.CheckPass:
+		return locales.CheckWiFiIPhoneSeen()
+	case ck.Fix == driver.FixSameNetwork:
+		return locales.CheckWiFiIPhoneNotSeen()
+	case ck.Fix == driver.FixWiFiSetting:
+		return locales.CheckWiFiIPhoneOff()
+	case ck.Status == driver.CheckFail:
+		return locales.CheckWiFiIPhoneFail()
+	default:
+		return locales.CheckWiFiIPhoneUnknown()
+	}
+}
+
 // checkOrder is the order items show in; others follow.
 var checkOrder = []string{driver.CheckHost, driver.CheckADB, driver.CheckConnection, driver.CheckAuthorized, driver.CheckCompanion,
 	driver.CheckDeveloperMode, driver.CheckDiskImage, driver.CheckHelper,
@@ -444,6 +462,15 @@ func (a *app) checkWords(d gateway.DeviceView, v gateway.CheckupView, ck driver.
 			w.text = locales.CheckBackgroundFail()
 		}
 	case driver.CheckWiFi:
+		if d.Info.Platform == driver.IOS {
+			// From what Pinky knows of the phone's Wi-Fi connection
+			// (gateway.WiFiCheck).
+			w.text, w.detail = iphoneWiFiText(d, ck), true
+			if d.Info.WiFi.Connections == driver.WiFiConnectionsTurnedOn && ck.Status != driver.CheckFail {
+				w.note = locales.CheckWiFiIPhoneTurnedOn()
+			}
+			break
+		}
 		switch {
 		case pass && d.Info.Via == driver.ViaTailscale:
 			w.text, w.detail = locales.CheckConnectionTailscale(), false

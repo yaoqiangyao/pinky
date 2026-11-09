@@ -4,6 +4,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	mg "github.com/egoist/mygo/ui"
@@ -130,4 +131,30 @@ func TestCheckupIPhoneScreenshots(t *testing.T) {
 	shoot("iphone-checkup.png")
 	inLanguage(t, "zh-Hans", tt)
 	shoot("iphone-checkup-zh.png")
+}
+
+// TestCheckupRefusedImage says which image Apple refused and, for Xcode's
+// and one in Pinky's folder, that the steps also offer the third-party
+// mirror's.
+func TestCheckupRefusedImage(t *testing.T) {
+	var a app
+	ck := driver.Check{ID: driver.CheckAuthorized, Status: driver.CheckFail, Fix: driver.SetupDiskImageRefused}
+	d := gateway.DeviceView{Info: driver.Info{Platform: driver.IOS, State: driver.StateNeedsSetup, Setup: driver.SetupDiskImageRefused,
+		DiskImage: &driver.DiskImage{Source: driver.DiskImageFromXcode, Build: "17B48", Version: "17.2.48.0"}}}
+	w, ok := a.iphoneCheckWords(d, ck)
+	if !ok || w.title != locales.AddPhoneIPhoneRefusedTitle() || !strings.Contains(w.text, "17B48") || w.note != locales.CheckDiskImageRefusedNote() || w.detail {
+		t.Errorf("Xcode's image refused: %+v", w)
+	}
+	d.Info.DiskImage = &driver.DiskImage{Source: driver.DiskImageFromFolder, Build: "17B48", Version: "17.2.48.0", Dir: `C:\Users\me\AppData\Local\Pinky\DeveloperDiskImages\iOS_DDI\Restore`}
+	w, _ = a.iphoneCheckWords(d, ck)
+	if w.note != locales.CheckDiskImageRefusedNote() || !strings.Contains(w.text, `Pinky\DeveloperDiskImages`) {
+		t.Errorf("an image in Pinky's folder refused: %+v", w)
+	}
+	for _, source := range []string{driver.DiskImageFromMirror, driver.DiskImageFromEnv} {
+		d.Info.DiskImage = &driver.DiskImage{Source: source, Build: "27A5228h", Version: "27.1.5228.8"}
+		w, _ = a.iphoneCheckWords(d, ck)
+		if w.note != locales.AddPhoneIPhoneRefusedRetry() || !strings.Contains(w.text, "27A5228h") {
+			t.Errorf("the %s image refused: %+v", source, w)
+		}
+	}
 }

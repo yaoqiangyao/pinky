@@ -17,8 +17,10 @@ import (
 )
 
 // Downloading Apple's developer disk image from a third-party mirror, for
-// a computer without an official copy (no Xcode): offered only when no
-// official image is found, and done only when the person asks. Pinky pins
+// a computer without an official copy (no Xcode) or whose official copy
+// (Xcode's, or one in Pinky's folder) Apple's signing server refused:
+// offered only then, and done only when the person asks; a download is
+// then used instead of a refused image. Pinky pins
 // every file by size and SHA-256 at one commit of the mirror, so a changed
 // file is refused, and the phone mounts only what Apple's signing server
 // signs for it. Pinky itself hosts and ships none of Apple's files.

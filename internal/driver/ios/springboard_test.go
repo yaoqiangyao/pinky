@@ -61,7 +61,7 @@ func TestOverlayEvents(t *testing.T) {
 	d := &Device{apps: &appCatalog{apps: []driver.App{{ID: "com.apple.MobileSMS", Name: "Messages"}}, at: time.Now()}}
 	d.sb.app = &axpObject{PID: 37, ID: 1, IsApp: true}
 	over := []sbOverlay{timerAlert(), banner()}
-	evs, covered, dlg := d.overlayEvents(ctx, over, 3, 1125, 2436)
+	evs, covered, dlg, notes := d.overlayEvents(ctx, over, 3, 1125, 2436)
 	if len(evs) != 2 || evs[0].Kind != screen.EventDialog || evs[0].Text != "Timer, Stop, Repeat" {
 		t.Fatalf("events %+v", evs)
 	}
@@ -82,13 +82,44 @@ func TestOverlayEvents(t *testing.T) {
 	if strings.Join(labels, "; ") != "text Timer; button Stop; button Repeat" {
 		t.Errorf("dialog elements: %v", labels)
 	}
-	// While they stay, they are not reported again; once gone and back, they are.
-	if evs, _, _ := d.overlayEvents(ctx, over, 3, 1125, 2436); len(evs) != 0 {
+	// The banner is an element too, with its place, its whole text and
+	// the app that posted it, for the gateway to mask and hide.
+	wantNote := screen.Element{Role: screen.RoleButton, Label: "Messages, Anna, Your code is 123456", Source: screen.SourceTree,
+		Bounds: screen.Rect{X: 24, Y: 30, W: 1077, H: 240}, Path: springBoard, ID: "pinky:notification:com.apple.MobileSMS"}
+	if len(notes) != 1 || !sameElement(notes[0], wantNote) {
+		t.Errorf("notification elements %+v", notes)
+	}
+	// While they stay, they are not reported again, but the banner is
+	// listed on every read; once gone and back, they are reported.
+	evs, _, _, notes = d.overlayEvents(ctx, over, 3, 1125, 2436)
+	if len(evs) != 0 {
 		t.Errorf("reported again: %+v", evs)
 	}
+	if len(notes) != 1 || notes[0].ID != wantNote.ID {
+		t.Errorf("the banner on a later read: %+v", notes)
+	}
 	d.overlayEvents(ctx, nil, 3, 1125, 2436)
-	if evs, _, _ := d.overlayEvents(ctx, over[:1], 3, 1125, 2436); len(evs) != 1 {
-		t.Errorf("an alert that came back: %+v", evs)
+	if evs, _, _, notes := d.overlayEvents(ctx, over[:1], 3, 1125, 2436); len(evs) != 1 || len(notes) != 0 {
+		t.Errorf("an alert that came back: %+v %+v", evs, notes)
+	}
+}
+
+func sameElement(a, b screen.Element) bool {
+	return a.Role == b.Role && a.Label == b.Label && a.Source == b.Source && a.Bounds == b.Bounds && a.Path == b.Path && a.ID == b.ID
+}
+
+// A banner of an app the phone's apps do not name, and one whose frames
+// are another process's: listed without the app, and without a place.
+func TestNotificationElementUnknown(t *testing.T) {
+	d := &Device{apps: &appCatalog{apps: []driver.App{{ID: "com.apple.MobileSMS", Name: "Messages"}}, at: time.Now()}}
+	live := sbOverlay{key: [2]uint64{37, 700}, els: []raxElement{
+		{Object: &axpObject{PID: 90, ID: 1}, Parent: -1, Traits: traitButton, Label: "Northbank, Card charged",
+			Frame: axpRect{8, 10, 359, 80}, HasFrame: true, IsElement: true, Visible: true, Enabled: true},
+	}}
+	_, covered, _, notes := d.overlayEvents(context.Background(), []sbOverlay{live}, 3, 1125, 2436)
+	if len(covered) != 0 || len(notes) != 1 || notes[0].ID != "pinky:notification" || !notes[0].Bounds.Empty() ||
+		notes[0].Label != "Northbank, Card charged" {
+		t.Fatalf("covered %v, notes %+v", covered, notes)
 	}
 }
 

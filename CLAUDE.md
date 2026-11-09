@@ -8,6 +8,12 @@ Read [docs/WORKING.md](docs/WORKING.md) before you change anything: who owns whi
 
 The README comes in English, [README.md](README.md), and in Simplified Chinese, [README.zh-CN.md](README.zh-CN.md), which follows it section by section (building from source is only summed up there). Change both in the same commit. Write the Chinese with the app's own names for menus and buttons (`cmd/pinky/locales/zh-Hans.json`), and give a new picture with words in it a Chinese copy next to the English one (`assets/readme/*-zh.*`).
 
+[README.ja.md](README.ja.md) is a community translation into Japanese. It may lag behind the English, and a commit that changes the README need not change it.
+
+## The app's languages
+
+The app speaks English, Simplified Chinese and Japanese. Every message it shows lives in `cmd/pinky/locales`: add or change the English in `en.json` (with its `@key` description) and, in the same commit, the Chinese in `zh-Hans.json` and the Japanese in `ja.json`; when the English of a message changes, recheck both translations. Then run `go tool mygo generate cmd/pinky`; `go test ./cmd/pinky/locales` fails when a catalog lacks a message, and `go tool mygo i18n check cmd/pinky` lists what is missing. Write the Japanese with the terms `ja.json` already uses (スマホ, パソコン, 「設定 › スマホ」) and with the names Apple and Android give their settings in Japanese. [docs/notes/client.md](docs/notes/client.md) ("i18n") has the details. Release notes stay English and Chinese only (below): Pinky in Japanese shows the English ones.
+
 ## Releases
 
 This checkout is flyfox's fork: `origin` is `yaoqiangyao/pinky`, and `upstream` is `DIYgod/pinky`, whose changes are merged in by hand. Its releases are Windows only, for iPhones on iOS 27 or later: no companion APK, no macOS or Linux packages, no Homebrew cask, and no telemetry. Keep the fork's changes small so that upstream merges stay easy.

@@ -76,8 +76,9 @@ type recPlayer struct {
 	cancel context.CancelFunc
 	player *video.Player
 	bitmap *mg.Bitmap
-	picW   int
+	picW   int // the picture's size the right way up
 	picH   int
+	turn   int    // quarter turns clockwise that put the picture upright
 	state  string // "loading", "playing", "paused", "ended", "failed"
 	err    error
 	pos    time.Duration // where the picture shown is, from the recording's start
@@ -196,7 +197,14 @@ func (pl *recPlayer) take(pt *mg.Painter) {
 	}
 	if f := p.Take(); f != nil {
 		pl.bitmap = showPlanes(pl.bitmap, f.YUV)
-		pl.picW, pl.picH = f.Width, f.Height
+		w, h := f.Width, f.Height
+		if f.Turn%2 == 1 {
+			w, h = h, w
+		}
+		if pl.picW > 0 && (w != pl.picW || h != pl.picH) {
+			pl.a.post(func() {}) // the phone turned: lay the player out again
+		}
+		pl.picW, pl.picH, pl.turn = w, h, f.Turn
 		if pl.first {
 			// PTS count from the recording's start, as recording.Open
 			// sends them; a stream counting from where it opened starts
@@ -243,7 +251,7 @@ func (a *app) recordingView(c *mg.Context, t gateway.TaskView, pl *recPlayer) {
 				scr.Draw(func(pt *mg.Painter, r mg.Rect) {
 					pl.take(pt)
 					if pl.bitmap != nil {
-						pt.Clip(r, 28, func() { pt.Image(pl.bitmap, r, mg.Contain) })
+						pt.Clip(r, 28, func() { drawTurned(pt, pl.bitmap, r, pl.turn) })
 					}
 					// What the step at this moment acted on, for a moment after
 					// its mark.

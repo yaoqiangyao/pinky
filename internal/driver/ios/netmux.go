@@ -1,0 +1,143 @@
+package ios
+
+import (
+	"context"
+	"net"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"sync"
+
+	"github.com/DIYgod/pinky/internal/driver/ios/netmux"
+	goios "github.com/danielpaulus/go-ios/ios"
+)
+
+// Phones over Wi-Fi on Linux. libimobiledevice's usbmuxd, the one Linux
+// systems have, lists phones on a cable only, so a phone that Pinky used
+// went offline when it was unplugged instead of moving to Wi-Fi. With
+// Provider.WiFiMux, while Pinky uses phones over Wi-Fi, the provider runs a
+// usbmuxd of its own (the package netmux) in front of the system's: it
+// hands it everything about phones on a cable, and adds the phones it finds
+// on the network itself, as macOS's usbmuxd lists them, matched to this
+// computer's pair records. go-ios, and so everything Pinky does with a
+// phone, goes through it from then on (USBMUXD_SOCKET_ADDRESS, set for
+// this process). Turning Wi-Fi off stops the search, and the phones on
+// Wi-Fi leave the list; phones on a cable go on through it.
+//
+// When USBMUXD_SOCKET_ADDRESS is set already (netmuxd, usbmuxd2 or
+// another usbmuxd the person runs), Pinky uses that one and leaves the
+// network to it.
+
+// muxState is the provider's usbmuxd of its own. Its zero value is ready.
+type muxState struct {
+	mu      sync.Mutex
+	mux     *netmux.Mux
+	stop    context.CancelFunc // ends the search while it runs
+	skipped bool               // USBMUXD_SOCKET_ADDRESS was set, or the socket failed
+
+	// For tests.
+	anyOS    bool
+	browseFn func() (netmux.Source, error)
+	pairFn   func(udid string) (netmux.PairInfo, error)
+	probeFn  func(ctx context.Context, addr netip.Addr) bool
+	dir      string // where the socket goes instead of a new folder
+}
+
+// wifiMux starts the usbmuxd of its own and the search when Pinky uses
+// phones over Wi-Fi, and stops the search when it no longer does.
+func (p *Provider) wifiMux(on bool) {
+	if !p.WiFiMux || (runtime.GOOS != "linux" && !p.nmux.anyOS) {
+		return
+	}
+	m := &p.nmux
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !on {
+		if m.stop != nil {
+			m.stop()
+			m.stop = nil
+		}
+		return
+	}
+	if m.mux == nil && !m.skipped {
+		p.startMuxLocked()
+	}
+	if m.mux == nil || m.stop != nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.stop = cancel
+	f := &netmux.Finder{Mux: m.mux, UDIDs: p.pairedUDIDs, Log: p.logger(), BrowseFn: m.browseFn}
+	if m.probeFn != nil {
+		f.ProbeFn = m.probeFn
+	}
+	if m.pairFn != nil {
+		f.PairFn = m.pairFn
+	}
+	go f.Run(ctx)
+}
+
+// startMuxLocked starts the usbmuxd of its own and points go-ios at it.
+// The caller holds p.nmux.mu.
+func (p *Provider) startMuxLocked() {
+	m := &p.nmux
+	if v := os.Getenv("USBMUXD_SOCKET_ADDRESS"); v != "" {
+		m.skipped = true
+		p.logger().Info("iphone: using the usbmuxd in USBMUXD_SOCKET_ADDRESS, which lists phones on Wi-Fi itself or not", "address", v)
+		return
+	}
+	upstream := goios.GetUsbmuxdSocket()
+	dir := m.dir
+	if dir == "" {
+		base := os.Getenv("XDG_RUNTIME_DIR")
+		if base == "" {
+			base = os.TempDir()
+		}
+		d, err := os.MkdirTemp(base, "pinky-usbmuxd-") // 0700: this user's only
+		if err != nil {
+			m.skipped = true
+			p.logger().Warn("iphone: cannot look for phones on Wi-Fi", "err", err)
+			return
+		}
+		dir = d
+	}
+	path := filepath.Join(dir, "usbmuxd")
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		m.skipped = true
+		p.logger().Warn("iphone: cannot look for phones on Wi-Fi", "err", err)
+		return
+	}
+	m.mux = netmux.New(upstream, p.logger())
+	go m.mux.Serve(l)
+	os.Setenv("USBMUXD_SOCKET_ADDRESS", "unix://"+path)
+	p.logger().Info("iphone: looking for iPhones and iPads on Wi-Fi itself; this computer's usbmuxd lists phones on a cable only", "usbmuxd", upstream)
+}
+
+// pairedUDIDs returns the phones this computer paired with: those with a
+// pair record where libimobiledevice's usbmuxd keeps them, and those Pinky
+// has seen. Under Only, only those phones.
+func (p *Provider) pairedUDIDs() []string {
+	ids := map[string]bool{}
+	for _, id := range netmux.PairedUDIDs(netmux.LockdownDir) {
+		ids[id] = true
+	}
+	p.mu.Lock()
+	for id := range p.known {
+		ids[id] = true
+	}
+	for id := range p.wifi.use {
+		ids[id] = true
+	}
+	p.mu.Unlock()
+	var out []string
+	for id := range ids {
+		if p.Only == nil || p.Only[id] {
+			out = append(out, id)
+		}
+	}
+	sort.Strings(out)
+	return out
+}

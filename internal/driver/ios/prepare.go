@@ -2,9 +2,11 @@ package ios
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -84,6 +86,10 @@ type preparer struct {
 	jobs     map[string]*mountJob // by UDID
 	revealed map[string]entryKey  // the attach the Developer Mode switch was shown for
 	asked    map[string]time.Time // the last pairing request (Windows), by UDID
+	// Images Apple's signing server refused, by refusalKey, kept in
+	// refusedFile in Pinky's folder for images; loaded from refusedIn.
+	refused   map[string]time.Time
+	refusedIn *string
 
 	// For tests.
 	findFn   func(ownDir string) (diskImage, error)
@@ -117,17 +123,17 @@ func (pr *preparer) clock() time.Time {
 // mountState returns the phone's mount job, starting one when none ran for
 // this attach or when the last one failed long enough ago. When Apple's
 // signing server refused the image the last one used, it starts one only
-// once the image this computer has changed: the same image would be refused
-// again. check tells whether the services Pinky needs are there; done runs
-// when a job ends; log gets a line when a job starts and when it ends.
+// once this computer has an image Apple has not refused, or none: the same
+// image would be refused again. check tells whether the services Pinky
+// needs are there; done runs when a job ends; log gets a line when a job
+// starts and when it ends.
 func (pr *preparer) mountState(e goios.DeviceEntry, ownDir string, check func(context.Context, goios.DeviceEntry) (bool, error), done func(), log *slog.Logger) mountJob {
 	id, key := e.Properties.SerialNumber, keyOf(e)
 	// Looking for the image reads files, so not while holding the lock.
-	refused, wasRefused := pr.refusedImage(id, key)
-	sameImage := false
-	if wasRefused {
+	another := false
+	if pr.lastRefused(id, key) {
 		img, err := pr.find(ownDir)
-		sameImage = err == nil && img == refused
+		another = err != nil || !pr.isRefused(ownDir, img)
 	}
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
@@ -135,7 +141,7 @@ func (pr *preparer) mountState(e goios.DeviceEntry, ownDir string, check func(co
 		pr.jobs = map[string]*mountJob{}
 	}
 	j := pr.jobs[id]
-	if j != nil && j.key == key && (j.running || pr.clock().Sub(j.ended) < retryAfter(j.err) || sameImage && j.img == refused && imageRefused(j.err)) {
+	if j != nil && j.key == key && (j.running || pr.clock().Sub(j.ended) < retryAfter(j.err) || imageRefused(j.err) && !another) {
 		return *j
 	}
 	j = &mountJob{key: key, running: true}
@@ -154,11 +160,27 @@ func (pr *preparer) run(j *mountJob, e goios.DeviceEntry, ownDir string, check f
 	id, start := e.Properties.SerialNumber, time.Now()
 	img, err := pr.find(ownDir)
 	var res mountResult
-	if err == nil {
+	for err == nil {
 		log.Info("iphone: mounting the developer disk image", "device", id, "image", imageName(img), "dir", img.Dir)
 		res, err = mount(ctx, e, img)
+		if !imageRefused(err) {
+			break
+		}
+		// Apple will not sign it: the next image here it has not refused,
+		// if any, in the same job (an official copy gives way to the
+		// mirror's download).
+		pr.setRefused(ownDir, img, true, log)
+		next, ferr := pr.find(ownDir)
+		if ferr != nil || pr.isRefused(ownDir, next) {
+			break
+		}
+		log.Warn("iphone: Apple's signing server refused the developer disk image; trying another", "device", id, "image", imageName(img), "version", img.Version, "err", err, "next", imageName(next))
+		img, err = next, nil
 	}
 	if err == nil {
+		if !res.Already { // Apple signed it this time
+			pr.setRefused(ownDir, img, false, log)
+		}
 		err = waitForServices(ctx, e, check)
 	}
 	took := time.Since(start).Round(time.Millisecond)
@@ -302,24 +324,97 @@ func imageRefused(err error) bool {
 	return err != nil && classifyMountError(err) == problemRefused
 }
 
-// refusedImage returns the image the phone's last mount on this attach
-// used, when Apple's signing server refused to sign it.
-func (pr *preparer) refusedImage(id string, key entryKey) (diskImage, bool) {
+// lastRefused reports whether the phone's last mount on this attach ended
+// with Apple's signing server refusing the image.
+func (pr *preparer) lastRefused(id string, key entryKey) bool {
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
 	j := pr.jobs[id]
-	if j == nil || j.key != key || j.running || !imageRefused(j.err) {
-		return diskImage{}, false
-	}
-	return j.img, true
+	return j != nil && j.key == key && !j.running && imageRefused(j.err)
 }
 
-// find looks for the developer disk image to mount.
+// find looks for the developer disk image to mount, passing over those
+// Apple's signing server refused while there is another.
 func (pr *preparer) find(ownDir string) (diskImage, error) {
 	if pr.findFn != nil {
 		return pr.findFn(ownDir)
 	}
-	return findDiskImage(ownDir)
+	return findDiskImageAvoiding(ownDir, func(img diskImage) bool { return pr.isRefused(ownDir, img) })
+}
+
+// refusedFile, in Pinky's folder for images, keeps the images Apple's
+// signing server refused across runs, so Pinky does not go back to one:
+// {"<build> <version>": "<when>"}.
+const refusedFile = "refused.json"
+
+// refusalKey names an image in the refusals: by build and version, which
+// stand for its digests, which are what Apple decides by.
+func refusalKey(img diskImage) string {
+	return img.Build + " " + img.Version
+}
+
+// isRefused reports whether Apple's signing server refused img.
+func (pr *preparer) isRefused(ownDir string, img diskImage) bool {
+	pr.mu.Lock()
+	defer pr.mu.Unlock()
+	pr.loadRefusedLocked(ownDir)
+	_, ok := pr.refused[refusalKey(img)]
+	return ok
+}
+
+// setRefused records that Apple's signing server refused img, or signed it
+// (refused false), in memory and in refusedFile when it changed.
+func (pr *preparer) setRefused(ownDir string, img diskImage, refused bool, log *slog.Logger) {
+	pr.mu.Lock()
+	defer pr.mu.Unlock()
+	pr.loadRefusedLocked(ownDir)
+	k := refusalKey(img)
+	if _, had := pr.refused[k]; had == refused {
+		return
+	}
+	if refused {
+		pr.refused[k] = pr.clock()
+	} else {
+		delete(pr.refused, k)
+	}
+	if ownDir == "" {
+		return
+	}
+	b, err := json.MarshalIndent(pr.refused, "", "  ")
+	if err == nil {
+		err = os.MkdirAll(ownDir, 0o755)
+	}
+	if err == nil {
+		err = os.WriteFile(filepath.Join(ownDir, refusedFile), b, 0o644)
+	}
+	if err != nil {
+		logTo(log).Warn("iphone: could not keep the developer disk images Apple refused", "err", err)
+	}
+}
+
+// loadRefusedLocked reads refusedFile from ownDir once, with pr.mu held.
+func (pr *preparer) loadRefusedLocked(ownDir string) {
+	if pr.refusedIn != nil && *pr.refusedIn == ownDir {
+		return
+	}
+	pr.refusedIn = &ownDir
+	pr.refused = readRefusals(ownDir)
+}
+
+// readRefusals reads refusedFile from ownDir: none when there is none,
+// and a damaged file only forgets.
+func readRefusals(ownDir string) map[string]time.Time {
+	refused := map[string]time.Time{}
+	if ownDir == "" {
+		return refused
+	}
+	if b, err := os.ReadFile(filepath.Join(ownDir, refusedFile)); err == nil {
+		_ = json.Unmarshal(b, &refused)
+		if refused == nil {
+			refused = map[string]time.Time{}
+		}
+	}
+	return refused
 }
 
 // forget drops a phone's job, so the next mountState starts a new one.

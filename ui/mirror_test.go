@@ -168,7 +168,7 @@ func TestMirrorShowsPlanes(t *testing.T) {
 		t.Errorf("between pictures, the bars show %d levels off", off)
 	}
 
-	pic := m.lastPicture()
+	pic, _ := m.lastPicture()
 	if pic == nil {
 		t.Fatal("no picture for a screenshot")
 	}

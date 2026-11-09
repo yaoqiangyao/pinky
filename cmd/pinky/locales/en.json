@@ -442,7 +442,7 @@
   },
   "addPhoneIPhoneRefusedFolder": "Pinky used the developer disk image in {folder}: build {build}, version {version}. Apple's signing server no longer signs it, so it can't be mounted on this iPhone. Replace it with the iOS_DDI folder of a Mac where the latest Xcode from the App Store was opened once.",
   "@addPhoneIPhoneRefusedFolder": {
-    "description": "Add phone › iPhone and the phone's checkup, under the preparation step when Apple's signing server refused to sign the developer disk image Pinky found on this computer (Apple's add-on that gives a phone its developer services; it comes with Xcode), as Apple does with images it no longer signs, such as those of Xcode before 27: the text when the image is one the person put in a folder (Pinky's own, or the one the PINKY_DDI environment variable names). folder is that folder; build is the Xcode build the image came with; version is the image's version, or a dash when unknown. iOS_DDI is a folder name.",
+    "description": "Add phone › iPhone and the phone's checkup, under the preparation step when Apple's signing server refused to sign the developer disk image Pinky found on this computer (Apple's add-on that gives a phone its developer services; it comes with Xcode), as Apple does with images it no longer signs, such as those of Xcode before 27: the text when the image is one the person put in a folder (Pinky's own, or the one the PINKY_DDI environment variable names); for Pinky's own folder, the offer to download an image from a third-party mirror instead (addPhoneIPhoneMirrorTitle) comes below it. folder is that folder; build is the Xcode build the image came with; version is the image's version, or a dash when unknown. iOS_DDI is a folder name.",
     "placeholders": {
       "folder": {
         "type": "String",
@@ -458,7 +458,7 @@
       }
     }
   },
-  "addPhoneIPhoneRefusedMirror": "Pinky used the developer disk image downloaded from the third-party mirror: build {build}, version {version}. Apple's signing server no longer signs it, so it can't be mounted on this iPhone. Install Xcode from the App Store and open it once, then you can quit it; or update Pinky once a version with a newer image is out.",
+  "addPhoneIPhoneRefusedMirror": "Pinky used the developer disk image downloaded from the third-party mirror: build {build}, version {version}. Apple's signing server no longer signs it, so it can't be mounted on this iPhone. Install or update Xcode from the App Store and open it once, then you can quit it; or update Pinky once a version with a newer image is out.",
   "@addPhoneIPhoneRefusedMirror": {
     "description": "Add phone › iPhone and the phone's checkup, under the preparation step when Apple's signing server refused to sign the developer disk image Pinky found on this computer (Apple's add-on that gives a phone its developer services; it comes with Xcode), as Apple does with images it no longer signs, such as those of Xcode before 27: the text when the image was downloaded from the third-party mirror (addPhoneIPhoneMirrorTitle). build is the Xcode build the image came with; version is the image's version, or a dash when unknown.",
     "placeholders": {
@@ -472,7 +472,7 @@
       }
     }
   },
-  "addPhoneIPhoneRefusedRetry": "Pinky tries again by itself as soon as a newer image is on this computer.",
+  "addPhoneIPhoneRefusedRetry": "Pinky tries again by itself as soon as another image is on this computer.",
   "@addPhoneIPhoneRefusedRetry": {
     "description": "Add phone › iPhone and the phone's checkup, under the preparation step when Apple's signing server refused to sign the developer disk image Pinky found on this computer (Apple's add-on that gives a phone its developer services; it comes with Xcode), as Apple does with images it no longer signs, such as those of Xcode before 27: a small note under the box."
   },
@@ -482,7 +482,7 @@
   },
   "addPhoneIPhoneRefusedXcode": "Pinky used the developer disk image that Xcode installed on this Mac: build {build}, version {version}. Apple's signing server no longer signs it, so it can't be mounted on this iPhone. Install or update Xcode from the App Store and open it once: it installs a newer image, and you can quit it then.",
   "@addPhoneIPhoneRefusedXcode": {
-    "description": "Add phone › iPhone and the phone's checkup, under the preparation step when Apple's signing server refused to sign the developer disk image Pinky found on this computer (Apple's add-on that gives a phone its developer services; it comes with Xcode), as Apple does with images it no longer signs, such as those of Xcode before 27: the text when the image came with Xcode on this Mac. build is the Xcode build the image came with; version is the image's version, or a dash when unknown.",
+    "description": "Add phone › iPhone and the phone's checkup, under the preparation step when Apple's signing server refused to sign the developer disk image Pinky found on this computer (Apple's add-on that gives a phone its developer services; it comes with Xcode), as Apple does with images it no longer signs, such as those of Xcode before 27: the text when the image came with Xcode on this Mac; below it come the App Store link (addPhoneIPhoneGetXcode) and the offer to download an image from a third-party mirror instead (addPhoneIPhoneMirrorTitle). build is the Xcode build the image came with; version is the image's version, or a dash when unknown.",
     "placeholders": {
       "build": {
         "type": "String",
@@ -582,7 +582,7 @@
   "@addPhoneIPhoneStepTrustWaiting": {
     "description": "Add phone › iPhone, the step list: next to a spinner under the Trust step."
   },
-  "addPhoneIPhoneStepTrustWiFiOn": "Then Pinky turns on its Wi-Fi connection, as Finder's “Show this iPhone when on Wi-Fi” does. Turning off Use iPhones and iPads over Wi-Fi leaves it on; Finder can turn it off.",
+  "addPhoneIPhoneStepTrustWiFiOn": "Then Pinky turns on its Wi-Fi connection, as Finder's “Show this iPhone when on Wi-Fi” does. Turning off Use iPhones and iPads over Wi-Fi leaves it on.",
   "@addPhoneIPhoneStepTrustWiFiOn": {
     "description": "Add phone › iPhone: a note under the trust step while Pinky uses iPhones over Wi-Fi: Pinky turns on the iPhone's Wi-Fi connection (lockdown's EnableWifiConnections, Finder's checkbox) once it trusts the computer."
   },
@@ -1164,6 +1164,10 @@
   "@checkDiskImageDownloadNote": {
     "description": "Checkup, an iPhone's item: a note under the item when this computer has no developer disk image: Add phone's steps (the button below) offer a download from a third-party mirror."
   },
+  "checkDiskImageRefusedNote": "Show the steps to download an image from a third-party mirror instead. Pinky tries again by itself as soon as another image is on this computer.",
+  "@checkDiskImageRefusedNote": {
+    "description": "The phone's checkup, under the developer disk image item when Apple's signing server refused to sign the image that came with Xcode on this Mac (addPhoneIPhoneRefusedXcode) or one the person put in Pinky's folder (addPhoneIPhoneRefusedFolder): a note saying that the setup steps (the button phoneSetUpIPhone) also offer to download an image from a third-party mirror (addPhoneIPhoneMirrorTitle), and that Pinky tries again once another image is there. Say it as checkDiskImageDownloadNote does."
+  },
   "checkDiskImageMissing": "Not mounted, so the iPhone doesn't offer what Pinky needs.",
   "@checkDiskImageMissing": {
     "description": "Checkup, an iPhone's item: the image is not mounted; Pinky's reason follows in English."
@@ -1357,6 +1361,30 @@
   "checkWiFiFail": "Pinky can't use this phone over Wi-Fi.",
   "@checkWiFiFail": {
     "description": "The checkup, Wi-Fi: failed."
+  },
+  "checkWiFiIPhoneFail": "Pinky couldn't turn on its Wi-Fi connection. Plug it in again to try once more, or tick “Show this iPhone when on Wi-Fi” in Finder.",
+  "@checkWiFiIPhoneFail": {
+    "description": "An iPhone's or iPad's checkup, the Wi-Fi item: Pinky could not turn on the phone's Wi-Fi connection (lockdown's EnableWifiConnections, Finder's checkbox); the error shows under it."
+  },
+  "checkWiFiIPhoneNotSeen": "Its Wi-Fi connection is on, but this computer doesn't see it on Wi-Fi. Check that both are on the same Wi-Fi network: guest networks and some routers keep devices apart, and a VPN on either can hide it. A phone whose Wi-Fi connection was just turned on can take a minute to show up.",
+  "@checkWiFiIPhoneNotSeen": {
+    "description": "An iPhone's or iPad's checkup, the Wi-Fi item: the phone's Wi-Fi connection is on, but the computer's device service does not list it over the network."
+  },
+  "checkWiFiIPhoneOff": "Use iPhones and iPads over Wi-Fi is off in Settings › Phones, so Pinky leaves its Wi-Fi connection as it is.",
+  "@checkWiFiIPhoneOff": {
+    "description": "An iPhone's or iPad's checkup, the Wi-Fi item: Pinky's Wi-Fi setting is off, so it did not look at the phone's Wi-Fi connection."
+  },
+  "checkWiFiIPhoneSeen": "Its Wi-Fi connection is on, and this computer sees it on Wi-Fi: unplugged, it keeps working while it's on the same Wi-Fi.",
+  "@checkWiFiIPhoneSeen": {
+    "description": "An iPhone's or iPad's checkup, the Wi-Fi item, while the phone is on its cable and also listed over the network."
+  },
+  "checkWiFiIPhoneTurnedOn": "Pinky turned it on when you plugged it in, as Finder's “Show this iPhone when on Wi-Fi” does.",
+  "@checkWiFiIPhoneTurnedOn": {
+    "description": "An iPhone's or iPad's checkup, a note under the Wi-Fi item: Pinky turned on the phone's Wi-Fi connection itself."
+  },
+  "checkWiFiIPhoneUnknown": "Pinky turns on its Wi-Fi connection once it's plugged in and trusts this computer.",
+  "@checkWiFiIPhoneUnknown": {
+    "description": "An iPhone's or iPad's checkup, the Wi-Fi item, before Pinky could look at the phone's Wi-Fi connection (not plugged in since Pinky started, or not trusting the computer yet)."
   },
   "checkWiFiOld": "Pairing over Wi-Fi needs Android 11 or later (this phone has Android {version}). Use USB.",
   "@checkWiFiOld": {
@@ -3550,6 +3578,10 @@
       }
     }
   },
+  "gwStatusNotSeenOnWiFi": "Not seen on Wi-Fi",
+  "@gwStatusNotSeenOnWiFi": {
+    "description": "A phone's status line: an iPhone or iPad unplugged a moment ago that this computer does not see on Wi-Fi."
+  },
   "gwStatusOffline": "Offline",
   "@gwStatusOffline": {
     "description": "A phone's status line in the sidebar and tiles: the phone is offline. Shown only in other languages; in English the gateway's own words show."
@@ -4938,6 +4970,10 @@
   "@phoneNotConnected": {
     "description": "Under phoneOffline when the system says nothing more, before the Reconnect link."
   },
+  "phoneNotSeenOnWiFi": "This computer doesn't see {name} on Wi-Fi. It may be asleep (unlock it), on another Wi-Fi network, or on one that keeps devices apart, as guest networks and some routers do. A VPN on the computer or the phone can hide it too, and so can Pinky not being allowed on the local network (System Settings › Privacy & Security › Local Network). Plug it in to keep using it.",
+  "@phoneNotSeenOnWiFi": {
+    "description": "The Phone screen of an iPhone or iPad unplugged a moment ago that this computer does not see on Wi-Fi: neither the device service lists it nor does the network show it. {name} is the phone's name."
+  },
   "phoneOffline": "{phone} is offline",
   "@phoneOffline": {
     "description": "A phone's page when the phone is offline, under a phone outline.",
@@ -6198,7 +6234,7 @@
   "@settingsPrivacyRecord": {
     "description": "Settings › Privacy: the switch that records the phone's screen while agents work."
   },
-  "settingsPrivacyRecordDesc": "Used for replays in Activity. Recording pauses while a blocked app is open.",
+  "settingsPrivacyRecordDesc": "Used for replays in Activity. Recording pauses while a blocked app is open; its notifications and its card in recent apps are recorded as they show. Recordings stay on this computer.",
   "@settingsPrivacyRecordDesc": {
     "description": "Settings › Privacy: the line under Record the screen during tasks. Activity is the page of finished tasks."
   },
@@ -6510,9 +6546,41 @@
   "@settingsSafetyAppLabel": {
     "description": "Settings › Safety: the accessibility label of the field of an app to block."
   },
+  "settingsSafetyAppNoMatch": "No app on your phones is named “{name}”. Pinky blocks only that exact name: check the spelling, or pick the app from your phones.",
+  "@settingsSafetyAppNoMatch": {
+    "description": "Settings › Safety › Add app: a warning under the field when what the person typed is not the name or package of any app on the connected phones. name is what they typed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Nortbank"
+      }
+    }
+  },
   "settingsSafetyAppPlaceholder": "App name or package",
   "@settingsSafetyAppPlaceholder": {
     "description": "Settings › Safety: the placeholder of the field of an app to block, which takes the app's name or its package name, as com.example.app."
+  },
+  "settingsSafetyAppsLoading": "Looking for the apps on your phones…",
+  "@settingsSafetyAppsLoading": {
+    "description": "Settings › Safety › Add app: under the field while Pinky lists the apps on the connected phones."
+  },
+  "settingsSafetyAppsMore": "{count, plural, one {# more app: type more of its name} other {# more apps: type more of the name}}",
+  "@settingsSafetyAppsMore": {
+    "description": "Settings › Safety › Add app: under the apps it offers, when more apps match than it shows.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "settingsSafetyAppsNoPhone": "Connect a phone to pick from its apps, or type the app's exact name or package.",
+  "@settingsSafetyAppsNoPhone": {
+    "description": "Settings › Safety › Add app: under the field when no connected phone could list its apps."
+  },
+  "settingsSafetyAppsOnPhones": "On your phones",
+  "@settingsSafetyAppsOnPhones": {
+    "description": "Settings › Safety › Add app: the heading of the apps on the connected phones that match what is typed, which the person can click to block."
   },
   "settingsSafetyAskGroup": "When agents ask",
   "@settingsSafetyAskGroup": {
@@ -6526,21 +6594,31 @@
   "@settingsSafetyBlock": {
     "description": "Settings › Safety: the button next to the field that adds the app typed to the blocked apps."
   },
+  "settingsSafetyBlockApp": "Block {name}",
+  "@settingsSafetyBlockApp": {
+    "description": "Settings › Safety › Add app: the accessibility label of an app it offers, which blocks it when clicked.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Northbank"
+      }
+    }
+  },
   "settingsSafetyBlockedApps": "Blocked apps",
   "@settingsSafetyBlockedApps": {
     "description": "Settings › Safety: the heading of the apps agents may never open, and the accessibility label of that part."
   },
-  "settingsSafetyBlockedIntro": "Agents can't open these apps or see their screens.",
+  "settingsSafetyBlockedIntro": "Agents can't open these apps, see their screens or read their notifications.",
   "@settingsSafetyBlockedIntro": {
     "description": "Settings › Safety: the line under Blocked apps."
   },
   "settingsSafetyHideCodes": "Hide codes from agents",
   "@settingsSafetyHideCodes": {
-    "description": "Settings › Safety: the switch that hides passwords and one-time codes on the phone's screen from agents."
+    "description": "Settings › Safety: the switch that hides one-time codes, on the phone's screen and in its notifications, from agents."
   },
-  "settingsSafetyHideCodesDesc": "One-time codes in notifications are masked before an agent reads them",
+  "settingsSafetyHideCodesDesc": "One-time codes on the screen and in notifications are masked before an agent reads them, and covered in screenshots. Recordings, which stay on this computer, show them.",
   "@settingsSafetyHideCodesDesc": {
-    "description": "Settings › Safety: the line under Hide codes from agents."
+    "description": "Settings › Safety: the line under Hide codes from agents. Screenshots are the ones agents get and the ones Activity keeps; recordings are the screen recordings of tasks, which are not covered."
   },
   "settingsSafetyIntro": "Pinky checks every action before it reaches the phone. Agents can't change these settings.",
   "@settingsSafetyIntro": {

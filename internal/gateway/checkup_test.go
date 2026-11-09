@@ -190,3 +190,41 @@ func waitOnline(t *testing.T, g *Gateway, id string) {
 	}
 	t.Fatalf("%s never came online", id)
 }
+
+// TestWiFiCheck: an iPhone's checkup says where its Wi-Fi connection
+// stands, from what the provider knows; other phones get no such item.
+func TestWiFiCheck(t *testing.T) {
+	ios := func(conn string, w driver.WiFiConnection) driver.Info {
+		return driver.Info{Platform: driver.IOS, Connection: conn, WiFi: w}
+	}
+	for _, c := range []struct {
+		name   string
+		info   driver.Info
+		ok     bool
+		status driver.CheckStatus
+		fix    string
+	}{
+		{"an Android phone", driver.Info{Platform: driver.Android, Connection: "usb"}, false, "", ""},
+		{"over Wi-Fi", ios("wifi", driver.WiFiConnection{Connections: driver.WiFiConnectionsOn, Seen: true}), true, driver.CheckPass, ""},
+		{"on the cable, seen on Wi-Fi too", ios("usb", driver.WiFiConnection{Connections: driver.WiFiConnectionsTurnedOn, Seen: true}), true, driver.CheckPass, ""},
+		{"on, not seen", ios("usb", driver.WiFiConnection{Connections: driver.WiFiConnectionsTurnedOn}), true, driver.CheckWarn, driver.FixSameNetwork},
+		{"turning on failed", ios("usb", driver.WiFiConnection{Connections: driver.WiFiConnectionsFailed, Detail: "no answer"}), true, driver.CheckFail, driver.FixReconnect},
+		{"Pinky's switch off", ios("usb", driver.WiFiConnection{Connections: driver.WiFiConnectionsOff}), true, driver.CheckSkip, driver.FixWiFiSetting},
+		{"not trusted yet", ios("usb", driver.WiFiConnection{Connections: driver.WiFiConnectionsUnknown}), true, driver.CheckSkip, ""},
+	} {
+		got, ok := WiFiCheck(c.info)
+		if ok != c.ok || got.Status != c.status || got.Fix != c.fix || (ok && got.ID != driver.CheckWiFi) {
+			t.Errorf("%s: %+v, %v; want %s %q", c.name, got, ok, c.status, c.fix)
+		}
+	}
+}
+
+// TestNotSeenOnWiFiStatus: an iPhone unplugged a moment ago that is not seen
+// on Wi-Fi says so on its status line, unless a task waits for it.
+func TestNotSeenOnWiFiStatus(t *testing.T) {
+	g := &Gateway{}
+	d := &device{info: driver.Info{Platform: driver.IOS, State: driver.StateOffline, Setup: driver.SetupNotOnWiFi, Detail: "Not seen on Wi-Fi"}}
+	if st, line := g.statusLocked(d, nil); st != DeviceOffline || line != "Not seen on Wi-Fi" {
+		t.Fatalf("status %q %q", st, line)
+	}
+}

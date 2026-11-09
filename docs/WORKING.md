@@ -48,6 +48,7 @@ These are the owner's own phones, and nobody is watching while you test.
 
 - Go 1.27.3, module `github.com/DIYgod/pinky`. No cgo: `CGO_ENABLED=0 go build ./...` must pass. Call C libraries through purego.
 - English in code, comments, docs and commit messages.
+- Words the app shows belong in the catalogs in `cmd/pinky/locales`. A new or changed message gets its English (`en.json`, with a description), Simplified Chinese (`zh-Hans.json`) and Japanese (`ja.json`) in the same commit; `go test ./cmd/pinky/locales` fails when one is missing. See `docs/notes/client.md` ("i18n").
 - Conventional Commits, such as `feat(android): stream video over scrcpy`. End every commit message with a blank line and `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - `go build ./... && go vet ./... && go test ./...` must pass before each commit. Tests that need a real phone use the `device` build tag and read the device id from `PINKY_DEVICE`; run them through `scripts/devlock.sh`.
 - Work on your own branch. Push it to `origin` (a private repository) whenever it reaches a working state. Never push to `main`, never force-push. The main session merges.

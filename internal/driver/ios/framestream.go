@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"image"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/DIYgod/pinky/internal/driver"
@@ -18,9 +19,11 @@ import (
 
 // frame is one picture from a frameSource. key identifies its encoded
 // bytes, so a picture that did not change is not decoded or encoded again.
+// turn puts the picture the right way up.
 type frame struct {
 	key    uint64
 	decode func() (image.Image, error)
+	turn   quarter
 }
 
 // frameSource yields the phone's picture, one frame at a time.
@@ -47,6 +50,7 @@ type frameStream struct {
 	pk     chan driver.Packet
 	done   chan struct{}
 	w, h   int
+	turn   atomic.Int32 // the last frame's turn, plus one; 0 before the first
 
 	mu  sync.Mutex
 	err error
@@ -127,6 +131,8 @@ func (s *frameStream) run(ctx context.Context, first chan<- error) {
 		if w == 0 {
 			continue
 		}
+		y, uv, w, h = turnNV12(y, uv, w, h, f.turn)
+		s.turn.Store(int32(f.turn) + 1)
 		if enc != nil && (enc.w != w || enc.h != h) {
 			enc.Close() // the picture changed size (rotation)
 			enc = nil
@@ -176,6 +182,13 @@ func (s *frameStream) send(ctx context.Context, p driver.Packet) bool {
 }
 
 func (s *frameStream) Codec() driver.Codec { return driver.H264 }
+
+// lastTurn is the turn that put the last frame upright; ok is false before
+// the first frame.
+func (s *frameStream) lastTurn() (q quarter, ok bool) {
+	n := s.turn.Load()
+	return quarter(n - 1), n > 0
+}
 
 func (s *frameStream) Size() (int, int) {
 	s.mu.Lock()

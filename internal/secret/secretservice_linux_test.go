@@ -74,8 +74,9 @@ type fakeService struct {
 
 	mu          sync.Mutex
 	answer      string
-	prompts     int // prompts shown
-	dismissed   int // prompts dismissed by the client
+	lockRefuses string // "locked": Lock fails on a locked collection, as KWallet's does; "always": every Lock fails
+	prompts     int    // prompts shown
+	dismissed   int    // prompts dismissed by the client
 	next        int
 	collections map[dbus.ObjectPath]*fakeCollection
 	items       map[dbus.ObjectPath]*fakeItem
@@ -242,9 +243,14 @@ func (a fakeServiceAPI) Lock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus
 	a.f.mu.Lock()
 	defer a.f.mu.Unlock()
 	for _, o := range objects {
-		if c := a.f.collections[o]; c != nil {
-			c.locked = true
+		c := a.f.collections[o]
+		if c == nil {
+			continue
 		}
+		if a.f.lockRefuses == "always" || a.f.lockRefuses == "locked" && c.locked {
+			return nil, "", dbus.NewError("org.freedesktop.DBus.Error.Failed", []any{"Can't lock object at path " + string(o)})
+		}
+		c.locked = true
 	}
 	return objects, noPrompt, nil
 }
@@ -370,6 +376,10 @@ func (a fakeProperties) Get(msg dbus.Message, iface, name string) (dbus.Variant,
 		if c := a.f.collections[path]; c != nil {
 			return dbus.MakeVariant(c.label), nil
 		}
+	case ssCollection + ".Locked":
+		if c := a.f.collections[path]; c != nil {
+			return dbus.MakeVariant(c.locked), nil
+		}
 	}
 	return dbus.Variant{}, dbus.NewError("org.freedesktop.DBus.Error.UnknownProperty", nil)
 }
@@ -446,6 +456,61 @@ func TestSecretServiceSaveRevealDelete(t *testing.T) {
 	}
 	if err := s.Delete("pin:a"); err != nil {
 		t.Fatalf("Delete of nothing: %v", err)
+	}
+}
+
+// KWallet's Secret Service refuses to lock a collection that is locked
+// already; Reveal still unlocks it, asking the person.
+func TestSecretServiceLockRefusedWhenLocked(t *testing.T) {
+	f := startFakeService(t, startBus(t))
+	s := newSecretService("app.pinky.desktop.test", "Pinky test")
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := s.Save("pin:a", "1234"); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	f.lockRefuses = "locked"
+	f.mu.Unlock()
+	got, err := s.Reveal(ctx, "pin:a", "unlock A")
+	if err != nil || got != "1234" {
+		t.Fatalf("Reveal of a locked keyring = %q, %v", got, err)
+	}
+	if p, _ := f.counts(); p != 2 {
+		t.Fatalf("%d prompts after Reveal, want 2", p)
+	}
+	// An open keyring is locked first, so Reveal asks all the same.
+	f.mu.Lock()
+	for _, c := range f.collections {
+		c.locked = false
+	}
+	f.mu.Unlock()
+	if got, err := s.Reveal(ctx, "pin:a", "unlock A"); err != nil || got != "1234" {
+		t.Fatalf("Reveal of an open keyring = %q, %v", got, err)
+	}
+	if p, _ := f.counts(); p != 3 {
+		t.Fatalf("%d prompts after Reveal of an open keyring, want 3", p)
+	}
+}
+
+// A keyring that stays open because the service won't lock it is not
+// revealed without asking.
+func TestSecretServiceLockRefusedWhenOpen(t *testing.T) {
+	f := startFakeService(t, startBus(t))
+	s := newSecretService("app.pinky.desktop.test", "Pinky test")
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := s.Save("pin:a", "1234"); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	f.lockRefuses = "always"
+	for _, c := range f.collections {
+		c.locked = false
+	}
+	f.mu.Unlock()
+	if got, err := s.Reveal(ctx, "pin:a", "unlock A"); err == nil {
+		t.Fatalf("Reveal of a keyring that won't lock = %q, want an error", got)
 	}
 }
 

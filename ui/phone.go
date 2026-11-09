@@ -61,14 +61,15 @@ func (a *app) phonesPage(c *mg.Context) {
 		})
 	})
 	mg.Row(c).Grow(1).MinHeight(0).AlignItems(mg.Stretch).Children(func() {
-		center := mg.Column(c).Grow(1).MinWidth(0).Padding(16).Gap(14).AlignItems(mg.Center).Justify(mg.Center)
-		center.Children(func() {
-			if a.sel == allPhones {
-				a.allPhonesGrid(c)
-			} else if d := a.device(a.sel); d != nil {
-				a.phoneCenter(c, *d)
-			}
-		})
+		if a.sel == allPhones {
+			a.allPhonesGrid(c)
+		} else {
+			mg.Column(c).Grow(1).MinWidth(0).Padding(16).Gap(14).AlignItems(mg.Center).Justify(mg.Center).Children(func() {
+				if d := a.device(a.sel); d != nil {
+					a.phoneCenter(c, *d)
+				}
+			})
+		}
 		a.rightPanel(c)
 	})
 }
@@ -221,7 +222,7 @@ func (a *app) phoneCenter(c *mg.Context, d gateway.DeviceView) {
 	// Size the phone to the room the window gives it.
 	w, h := c.Size()
 	availH := h - 58 - 32 - 14 - 36
-	availW := w - 220 - 320 - 32
+	availW := w - sidebarWidth - rightPanelWidth - 32
 	if banner != (controlText{}) {
 		availH -= a.controlBanner(c, d.Info.ID, banner, min(460, availW)) + 14
 	} else {
@@ -406,7 +407,7 @@ func (a *app) moreControls(c *mg.Context, d gateway.DeviceView, m *mirror) {
 // saveScreenshot writes the mirror's last picture to the Desktop (or the
 // home folder) as a PNG.
 func (a *app) saveScreenshot(m *mirror, name string) {
-	pic := m.lastPicture()
+	pic, turn := m.lastPicture()
 	if pic == nil {
 		a.toasts = append(a.toasts, locales.PhoneNoPicture())
 		return
@@ -418,7 +419,7 @@ func (a *app) saveScreenshot(m *mirror, name string) {
 	now := time.Now()
 	path := filepath.Join(dir, locales.PhoneScreenshotName(name, now.Format("2006-01-02"), now.Format("15.04.05"))+".png")
 	go func() {
-		img := pic.RGBA()
+		img := turnRGBA(pic.RGBA(), turn)
 		f, err := os.Create(path)
 		if err == nil {
 			err = png.Encode(f, img)
@@ -436,10 +437,49 @@ func (a *app) saveScreenshot(m *mirror, name string) {
 	}()
 }
 
-// allPhonesGrid shows a live tile per phone; a click selects it.
+// The tiles of All phones: at least tileMinWidth wide, for the phone and
+// its padding, and at most tileMaxWidth, tileGap apart, in a scroll view
+// with gridPad of padding at its sides.
+const (
+	tileMinWidth = 200
+	tileMaxWidth = 232
+	tileGap      = 16
+	gridPad      = 16
+)
+
+// tileColumns returns how many columns the tiles of phones phones take
+// in room DIPs, and how wide the tiles are: as many as fit, or one per
+// phone when they all fit in a row, sharing the room up to tileMaxWidth
+// each.
+func tileColumns(room float32, phones int) (n int, width float32) {
+	n = max(1, min(int((room+tileGap)/(tileMinWidth+tileGap)), phones))
+	width = min((room-float32(n-1)*tileGap)/float32(n), tileMaxWidth)
+	return n, max(width, tileMinWidth)
+}
+
+// allPhonesGrid shows a live tile per phone; a click selects it. The
+// tiles sit in columns centered in the room between the sidebar and the
+// right panel, a last row that is not full starting in the first column,
+// and scroll under the page's header when there are more than the window
+// shows. Phones that all fit in one row are centered in it.
 func (a *app) allPhonesGrid(c *mg.Context) {
+	// The room is known from the window, as for the phone's mirror: the
+	// sidebar and the right panel have fixed widths.
+	w, _ := c.Size()
+	cols, width := tileColumns(w-sidebarWidth-rightPanelWidth-2*gridPad, len(a.devices))
+	tracks := make([]mg.Track, cols)
+	for i := range tracks {
+		tracks[i] = mg.Fixed(width)
+	}
+	mg.Scroll(c).Grow(1).MinWidth(0).Padding(24, gridPad, gridPad, gridPad).Label(locales.PhoneAllPhones()).
+		Children(func() { a.phoneTiles(c, tracks) })
+}
+
+// phoneTiles are the tiles of All phones, one per phone, in the grid's
+// columns.
+func (a *app) phoneTiles(c *mg.Context, cols []mg.Track) {
 	p := pal(c)
-	mg.Row(c).FillWidth().Grow(1).Wrap().Gap(16).Justify(mg.Center).AlignContent(mg.Start).Padding(8, 0, 0, 0).Children(func() {
+	mg.Grid(c).ColumnTracks(cols...).Gap(tileGap).Justify(mg.Center).Children(func() {
 		for _, d := range a.devices {
 			d := d
 			t := a.taskOf(d.Info.ID)
@@ -447,7 +487,7 @@ func (a *app) allPhonesGrid(c *mg.Context) {
 			offline := d.Status == gateway.DeviceOffline || d.Info.State == driver.StateOffline
 			// Connected, waiting for a step: not open, so nothing to mirror.
 			setup := !offline && d.Info.State != driver.StateOnline
-			tile := mg.Box(c.Key("tile-"+d.Info.ID)).Basis(200).Grow(1).MaxWidth(232).MinWidth(196).Radius(14).Border(1, p.line).Background(p.panel)
+			tile := mg.Box(c.Key("tile-"+d.Info.ID)).Radius(14).Border(1, p.line).Background(p.panel)
 			if asks {
 				tile.Border(1, p.amberEdge).Shadow(0, 0, 0, 1, p.amberEdge)
 			}
