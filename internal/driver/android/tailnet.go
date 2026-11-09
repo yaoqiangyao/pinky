@@ -55,7 +55,7 @@ func (p *Provider) Tailnet(ctx context.Context) (driver.TailnetStatus, error) {
 			ph.Connected = true
 			if ph.ID == "" {
 				if pr, err := p.deviceProps(ctx, e); err == nil {
-					ph.ID = phoneID(e, pr)
+					ph.ID = p.phoneID(e, pr)
 				}
 			}
 		}

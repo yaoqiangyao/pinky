@@ -702,7 +702,10 @@ func (g *Gateway) prepare(ctx context.Context, l *lease, a Action, cur *screen.S
 			return p, res
 		}
 		p.launch, p.url = app, url
-		p.input.Launch = screen.App{ID: app.ID, Name: app.Name}
+		// An app clone is judged as the app it copies: the two read
+		// alike on the screen.
+		orig := app.Original()
+		p.input.Launch = screen.App{ID: orig.ID, Name: orig.Name}
 		opener := false
 		if lo, ok := g.driverOf(d).(linkOpener); ok && url {
 			// The rules judge the app that opens the link: blocking or
@@ -1433,7 +1436,8 @@ func (g *Gateway) leaves(a Action, p *prep, cur *screen.Screen) bool {
 	case a.Tool == "key" && a.Key == "home":
 		return !g.policy.IsSystem(cur.App)
 	case a.Tool == "launch" && p != nil && !p.url:
-		to := screen.App{ID: p.launch.ID, Name: p.launch.Name}
+		orig := p.launch.Original() // a clone reads as its original
+		to := screen.App{ID: orig.ID, Name: orig.Name}
 		if to.ID == to.Name {
 			to.ID = "" // a phone that cannot list its apps: only the name is known
 		}

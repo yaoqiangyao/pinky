@@ -8,6 +8,8 @@ import (
 	"errors"
 	"image"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DIYgod/pinky/internal/screen"
@@ -250,6 +252,41 @@ type App struct {
 	// the name its home screen shows when that differs from the app's own
 	// ("微信" for WeChat, whose bundle is named WeChat in every language).
 	Aliases []string
+	// CloneOf is set on an app clone (Android's 应用分身, Dual apps, App
+	// Twin): a second copy of an installed app that the phone keeps in
+	// another Android user, with its own sign-in and data. The clone's ID
+	// is CloneID(package, user) and its Name says it is a clone; CloneOf
+	// is the app it copies. Rules, scopes and task app lists judge a clone
+	// as that app (Original), since the two read alike on the screen.
+	CloneOf *App
+}
+
+// Original returns the app as rules judge it: the app a clone copies, or
+// a itself.
+func (a App) Original() App {
+	if a.CloneOf != nil {
+		return *a.CloneOf
+	}
+	return a
+}
+
+// CloneID is the ID of the clone of a package in an Android user:
+// "com.tencent.mm@999".
+func CloneID(pkg string, user int) string {
+	return pkg + "@" + strconv.Itoa(user)
+}
+
+// ParseCloneID splits a CloneID into its package and user.
+func ParseCloneID(id string) (pkg string, user int, ok bool) {
+	pkg, u, found := strings.Cut(id, "@")
+	if !found || pkg == "" || u == "" {
+		return "", 0, false
+	}
+	n, err := strconv.Atoi(u)
+	if err != nil || n <= 0 || strconv.Itoa(n) != u {
+		return "", 0, false
+	}
+	return pkg, n, true
 }
 
 // Key is a hardware or navigation key.

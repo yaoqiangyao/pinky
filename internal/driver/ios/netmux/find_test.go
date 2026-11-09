@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -277,6 +278,56 @@ func TestFinderProbePace(t *testing.T) {
 	s.tick(ctx)
 	if probes != 1 || len(m.Phones()) != 1 {
 		t.Errorf("back: asked %d times, listed %v", probes, m.Phones())
+	}
+}
+
+// TestFinderLastAddressOnlyWhileItAnswers: a phone whose records name only
+// the cable's link (172.20.10.1) stays at its Wi-Fi address while lockdown
+// answers there, and moves to the link at once when it does not, rather
+// than waiting out dropAfter at a dead address.
+func TestFinderLastAddressOnlyWhileItAnswers(t *testing.T) {
+	m := New("unix:///nonexistent", nil)
+	src := &fakeSource{svcs: []mdns.Service{iphoneService("192.168.89.20")}}
+	now := time.Unix(1_000_000, 0)
+	wifiUp := true
+	f := &Finder{
+		Mux:      m,
+		UDIDs:    func() []string { return []string{"IPHONE"} },
+		BrowseFn: func() (Source, error) { return src, nil },
+		PairFn:   func(string) (PairInfo, error) { return PairInfo{HostID: testHostID}, nil },
+		ProbeFn: func(_ context.Context, a netip.Addr) bool {
+			return a.String() == "172.20.10.1" || wifiUp
+		},
+		NowFn: func() time.Time { return now },
+	}
+	s := newFindState(f, f.logOrDiscard())
+	ctx := context.Background()
+	at := func() string {
+		if ps := m.Phones(); len(ps) == 1 {
+			return ps[0].Addr.String()
+		}
+		return fmt.Sprint(m.Phones())
+	}
+	s.tick(ctx)
+	if got := at(); got != "192.168.89.20" {
+		t.Fatalf("listed at %s", got)
+	}
+	// Plugged in: its records name the cable's link only for a moment, and
+	// it still answers on Wi-Fi: it stays.
+	src.mu.Lock()
+	src.svcs = []mdns.Service{iphoneService("172.20.10.1")}
+	src.mu.Unlock()
+	now = now.Add(3 * time.Second)
+	s.tick(ctx)
+	if got := at(); got != "192.168.89.20" {
+		t.Errorf("moved to %s while it answered on Wi-Fi", got)
+	}
+	// Its Wi-Fi went off: at the link at once.
+	wifiUp = false
+	now = now.Add(3 * time.Second)
+	s.tick(ctx)
+	if got := at(); got != "172.20.10.1" {
+		t.Errorf("listed at %s once Wi-Fi stopped answering", got)
 	}
 }
 

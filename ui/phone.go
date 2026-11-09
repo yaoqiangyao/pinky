@@ -240,12 +240,8 @@ func (a *app) phoneCenter(c *mg.Context, d gateway.DeviceView) {
 	ph := min(availH, (availW-2*bezel)/aspect+2*bezel)
 	ph = max(ph, 240)
 	sw := (ph - 2*bezel) * aspect
-	radius, inner := float32(46), float32(38)
-	if d.Info.Platform == driver.IOS {
-		radius, inner = 50, 42
-	}
-	scale := (ph - 2*bezel) / 614 // the prototype's screen is 614 high
-	radius, inner = radius*max(scale, 0.6), inner*max(scale, 0.6)
+	// The bezel takes the screen's shape, turned with the phone (bezel.go).
+	radius, inner := bezelRadius(bezelOf(d), sw, ph-2*bezel, bezel)
 
 	// Keyed, the phone and its keys stay themselves as the banner comes
 	// and goes before them: the mirror keeps the keyboard's focus.
@@ -439,12 +435,14 @@ func (a *app) saveScreenshot(m *mirror, name string) {
 
 // The tiles of All phones: at least tileMinWidth wide, for the phone and
 // its padding, and at most tileMaxWidth, tileGap apart, in a scroll view
-// with gridPad of padding at its sides.
+// with gridPad of padding at its sides. The phone sits in a slot
+// tileSlotHeight high, a portrait phone's height.
 const (
-	tileMinWidth = 200
-	tileMaxWidth = 232
-	tileGap      = 16
-	gridPad      = 16
+	tileSlotHeight = 352
+	tileMinWidth   = 200
+	tileMaxWidth   = 232
+	tileGap        = 16
+	gridPad        = 16
 )
 
 // tileColumns returns how many columns the tiles of phones phones take
@@ -472,12 +470,12 @@ func (a *app) allPhonesGrid(c *mg.Context) {
 		tracks[i] = mg.Fixed(width)
 	}
 	mg.Scroll(c).Grow(1).MinWidth(0).Padding(24, gridPad, gridPad, gridPad).Label(locales.PhoneAllPhones()).
-		Children(func() { a.phoneTiles(c, tracks) })
+		Children(func() { a.phoneTiles(c, tracks, width) })
 }
 
 // phoneTiles are the tiles of All phones, one per phone, in the grid's
-// columns.
-func (a *app) phoneTiles(c *mg.Context, cols []mg.Track) {
+// columns, width DIPs wide.
+func (a *app) phoneTiles(c *mg.Context, cols []mg.Track, width float32) {
 	p := pal(c)
 	mg.Grid(c).ColumnTracks(cols...).Gap(tileGap).Justify(mg.Center).Children(func() {
 		for _, d := range a.devices {
@@ -504,28 +502,36 @@ func (a *app) phoneTiles(c *mg.Context, cols []mg.Track) {
 					a.selectPhone(d.Info.ID)
 				}
 				sel.Children(func() {
-					mini := mg.Box(c).Size(168, 352).Margin(0, mg.Auto).Shrink(0)
+					// The phone takes its screen's shape, turned with it,
+					// in a slot of the same height in every tile, so the
+					// rows stay even (bezel.go).
+					kind := bezelOf(d)
+					slotW := max(168, width-28) // the tile's padding
+					slot := mg.Box(c).Size(slotW, tileSlotHeight).Margin(0, mg.Auto).Shrink(0).Center()
 					switch {
-					case offline:
-						mini.Radius(24).Border(2, p.line2).Background(p.bg3).Center().Children(func() {
-							mg.Icon(c, icWifiOff).FontSize(26).TextColor(p.ink3)
-						})
-					case setup:
-						mini.Radius(24).Border(2, p.line2).Background(p.bg3).Center().Children(func() {
-							mg.Icon(c, icAlert).FontSize(26).TextColor(p.amberDot)
+					case offline, setup:
+						pw, ph, sw, sh := fitBezel(kind.defaultAspect(), slotW, tileSlotHeight, 2)
+						radius, _ := bezelRadius(kind, sw, sh, 2)
+						slot.Children(func() {
+							mini := mg.Box(c).Size(pw, ph).Shrink(0).Radius(radius).Border(2, p.line2).Background(p.bg3).Center()
+							if offline {
+								mini.Children(func() { mg.Icon(c, icWifiOff).FontSize(26).TextColor(p.ink3) })
+							} else {
+								mini.Children(func() { mg.Icon(c, icAlert).FontSize(26).TextColor(p.amberDot) })
+							}
 						})
 					default:
-						radius := float32(26)
-						if d.Info.Platform == driver.IOS {
-							radius = 30
-						}
-						mini.Radius(radius).Background(p.phone).Padding(5).Children(func() {
-							m, bgTask := a.screenFor(d, t, true)
-							shown := t
-							if bgTask && !m.agent {
-								shown = nil
-							}
-							a.mirrorView(c, m, d, shown, radius-5, true)
+						m, bgTask := a.screenFor(d, t, true)
+						pw, ph, sw, sh := fitBezel(m.aspect(d), slotW, tileSlotHeight, 5)
+						radius, inner := bezelRadius(kind, sw, sh, 5)
+						slot.Children(func() {
+							mg.Box(c.Key("mini-"+d.Info.ID)).Size(pw, ph).Shrink(0).Radius(radius).Background(p.phone).Padding(5).Children(func() {
+								shown := t
+								if bgTask && !m.agent {
+									shown = nil
+								}
+								a.mirrorView(c, m, d, shown, inner, true)
+							})
 						})
 					}
 					mg.Column(c).Gap(2).Children(func() {

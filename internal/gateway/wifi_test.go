@@ -31,6 +31,7 @@ type airProvider struct {
 	opens     map[string][]string // the connection of each Open, by id
 	sessions  map[string][]*overDevice
 	openDelay time.Duration // Open takes this long
+	hold      *listHold     // the next List waits for it (holdList)
 }
 
 func newAirProvider(devs ...*demo.Device) *airProvider {
@@ -62,7 +63,31 @@ func (p *airProvider) List(ctx context.Context) ([]driver.Info, error) {
 		}
 		out = append(out, info)
 	}
+	if h := p.hold; h != nil {
+		p.hold = nil
+		p.mu.Unlock()
+		close(h.held)
+		<-h.release
+		p.mu.Lock()
+	}
 	return out, err
+}
+
+// listHold makes one List take its listing, say so (held), and wait for
+// release before it returns it, as a listing slower than the passes after
+// it does.
+type listHold struct{ held, release chan struct{} }
+
+// holdList holds the next List until the returned function is called,
+// which the test's cleanup calls too.
+func (p *airProvider) holdList(t *testing.T) (held <-chan struct{}, release func()) {
+	h := &listHold{held: make(chan struct{}), release: make(chan struct{})}
+	p.mu.Lock()
+	p.hold = h
+	p.mu.Unlock()
+	release = sync.OnceFunc(func() { close(h.release) })
+	t.Cleanup(release)
+	return h.held, release
 }
 
 func (p *airProvider) Open(ctx context.Context, id string) (driver.Device, error) {
@@ -239,6 +264,38 @@ func TestWiFiFoundPhone(t *testing.T) {
 		if used, _, _ := p2.state(id); !used {
 			t.Fatalf("after a restart %s is not the person's", id)
 		}
+	}
+}
+
+// TestWiFiOlderListing: a discovery pass that listed a phone found on
+// Wi-Fi just before the person chose Use, and is slow to apply it, does not
+// undo the open of the pass after the choice: the phone opens once, and
+// stays online.
+func TestWiFiOlderListing(t *testing.T) {
+	p := newAirProvider(demo.NewDevice("ipad", "Mum's iPad", driver.IOS))
+	p.set("ipad", "wifi")
+	g, _ := newTestGateway(t, func(o *Options) { o.Providers = []driver.Provider{p} })
+	g.SetWiFi(true)
+	waitFor(t, "the found iPad", func() bool { v, ok := viewOf(g, "ipad"); return ok && v.StatusLine == "Found on Wi-Fi" })
+
+	held, release := p.holdList(t)
+	select {
+	case <-held: // a pass listed the iPad as found
+	case <-time.After(5 * time.Second):
+		t.Fatal("no discovery listed the phones")
+	}
+	if err := g.UseFoundPhone("ipad"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond) // long enough for a pass to open it
+	release()
+	waitFor(t, "the iPad online", func() bool { v, _ := viewOf(g, "ipad"); return v.Status == DeviceIdle })
+	time.Sleep(100 * time.Millisecond) // a few passes more (DiscoverEvery 20 ms)
+	if _, _, opens := p.state("ipad"); !slices.Equal(opens, []string{"wifi"}) {
+		t.Fatalf("opens %v", opens)
+	}
+	if v, _ := viewOf(g, "ipad"); v.Status != DeviceIdle {
+		t.Fatalf("iPad = %+v", v)
 	}
 }
 

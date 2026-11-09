@@ -40,7 +40,7 @@ func (x Exemption) Rules() []string { return append([]string{x.Rule}, x.With...)
 
 // matches reports whether the exemption is for the app.
 func (x Exemption) matches(app screen.App) bool {
-	id, name := strings.TrimSpace(app.ID), strings.TrimSpace(app.Name)
+	id, name := clonePackage(strings.TrimSpace(app.ID)), strings.TrimSpace(app.Name)
 	if x.App != "" && id != "" {
 		return x.App == id
 	}
@@ -188,7 +188,7 @@ func (e *Engine) Unexempt(x Exemption) error {
 
 // exemptionLocked is the exemption Exempt would keep.
 func (e *Engine) exemptionLocked(asks []string, app screen.App) (Exemption, bool) {
-	id, name := strings.TrimSpace(app.ID), strings.TrimSpace(app.Name)
+	id, name := clonePackage(strings.TrimSpace(app.ID)), strings.TrimSpace(app.Name)
 	if e.presetLocked() == PresetEvery || (id == "" && name == "") {
 		return Exemption{}, false
 	}

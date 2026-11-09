@@ -39,7 +39,7 @@ Pinky をインストールし、スマートフォンを接続し、エージ�
 
 | | 必要なもの |
 | --- | --- |
-| **Mac** | macOS 12 以降、Apple silicon または Intel |
+| **Mac** | macOS 13 以降、Apple silicon または Intel |
 | **Windows** | Windows 10 または 11、64 ビット（x64） |
 | **Linux** | Ubuntu 20.04、Debian 11 またはそれより新しいシステム（glibc 2.29 以降）と GTK 3 の入った 64 ビットの PC（x86-64） |
 | **Android スマートフォン** | Android 10〜17 と USB ケーブル。Pinky は自前の adb を持っています。Windows では USB ドライバーが必要なスマートフォンもあり、Linux では USB へのアクセスが必要です（[下記](#windows-と-linux-での-usb)） |

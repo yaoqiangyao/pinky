@@ -297,7 +297,7 @@ var ErrBlockedByRule = errors.New("blocked by a rule in rules.yaml that names th
 // app needs an ID, a Name or both. Unblocking an app that the bundled table
 // blocks (a banking app) adds it to apps.yaml's exclude list.
 func (e *Engine) SetAppBlocked(app screen.App, blocked bool) error {
-	app.ID, app.Name = strings.TrimSpace(app.ID), strings.TrimSpace(app.Name)
+	app.ID, app.Name = clonePackage(strings.TrimSpace(app.ID)), strings.TrimSpace(app.Name)
 	if app.ID == "" && app.Name == "" {
 		return errors.New("an app id or name is needed")
 	}

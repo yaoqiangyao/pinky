@@ -68,6 +68,7 @@ jobs:
         env:
           STRICT: "1"
           PINKY_NO_COMPANION: "1"
+          GH_TOKEN: ${{ github.token }} # scripts/adb.sh, when github.com's release downloads fail
         run: |
           go run ./scripts/release stamp "${TAG#v}"
           scripts/dist.sh windows "$RUNNER_TEMP/dist"

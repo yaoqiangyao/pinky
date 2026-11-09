@@ -118,7 +118,7 @@ func (a *Apps) Apply(o AppOverrides) {
 // "某某银行", "某行信用卡") is a finance app, unless apps.yaml excludes it.
 func (a *Apps) Categories(app screen.App) []string {
 	var out []string
-	id, name := strings.TrimSpace(app.ID), strings.ToLower(strings.TrimSpace(app.Name))
+	id, name := clonePackage(strings.TrimSpace(app.ID)), strings.ToLower(strings.TrimSpace(app.Name))
 	if id != "" && !a.excluded[id] {
 		out = append(out, a.ids[id]...)
 		for p, cats := range a.prefixes {

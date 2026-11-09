@@ -238,7 +238,7 @@ func TestNotes(t *testing.T) {
 }
 
 func TestStampConfig(t *testing.T) {
-	in := "{\n  \"name\": \"Pinky\",\n  \"version\": \"0.1.0\",\n  \"macos\": {\n    \"minimumSystemVersion\": \"12.0\"\n  }\n}\n"
+	in := "{\n  \"name\": \"Pinky\",\n  \"version\": \"0.1.0\",\n  \"macos\": {\n    \"minimumSystemVersion\": \"13.0\"\n  }\n}\n"
 	got, err := StampConfig(in, "2026.1107.1")
 	if want := strings.Replace(in, "0.1.0", "2026.1107.1", 1); err != nil || got != want {
 		t.Errorf("StampConfig = %q, %v; want %q", got, err, want)
@@ -320,8 +320,9 @@ func TestManifestAndCask(t *testing.T) {
 		`intel: "` + m.Assets["darwin-amd64"].SHA256 + `"`,
 		`url "https://github.com/DIYgod/pinky/releases/download/v#{version}/pinky-#{version}-darwin-#{arch}.zip"`,
 		"auto_updates true",
-		// Monterey or later; Homebrew 7 deprecates the ">= :monterey" form.
-		"depends_on macos: :monterey\n",
+		// Ventura or later, as the Go toolchain builds Pinky (macOS 13);
+		// Homebrew 7 deprecates the ">= :ventura" form.
+		"depends_on macos: :ventura\n",
 		`app "Pinky.app"`,
 		`command_wrapper "pinkyctl",`,
 	} {

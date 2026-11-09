@@ -636,6 +636,9 @@ func (g *Gateway) BlockedApps(ctx context.Context) []policy.BlockedApp {
 			continue
 		}
 		for _, a := range apps {
+			if a.CloneOf != nil {
+				continue // blocked or not with the app it copies
+			}
 			installed = append(installed, screen.App{ID: a.ID, Name: a.Name})
 		}
 	}
@@ -678,7 +681,9 @@ func (g *Gateway) InstalledApps(ctx context.Context) []InstalledApp {
 			continue
 		}
 		for _, a := range apps {
-			if a.ID == "" || seen[a.ID] {
+			// An app clone is blocked with the app it copies (the same
+			// package), so it is not offered on its own.
+			if a.ID == "" || seen[a.ID] || a.CloneOf != nil {
 				continue
 			}
 			seen[a.ID] = true

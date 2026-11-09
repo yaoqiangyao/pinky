@@ -171,7 +171,7 @@ func TestRecordingTurnsPicture(t *testing.T) {
 	if !ok {
 		t.Fatal("no player")
 	}
-	if r.W <= r.H {
-		t.Fatalf("the player is %vx%v, not landscape", r.W, r.H)
+	if r.W <= r.H || r.W > recordingWide+1 {
+		t.Fatalf("the player is %vx%v, not landscape at most %d wide", r.W, r.H, recordingWide)
 	}
 }

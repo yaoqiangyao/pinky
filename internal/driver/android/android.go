@@ -113,6 +113,9 @@ type Provider struct {
 
 	mu    sync.Mutex
 	props map[string]deviceProps // by serial and transport id
+	// aidSerials maps the android_id of a phone that hides its serial from
+	// the shell to the serial it was seen with (phoneID).
+	aidSerials map[string]string
 	// forgotten holds the phones the person removed from Pinky, by id,
 	// which the driver no longer connects to by itself (forget.go).
 	forgotten map[string]bool
@@ -148,8 +151,12 @@ func (p *Provider) Platform() driver.Platform { return driver.Android }
 type deviceProps struct {
 	Name, Model, OSVersion string
 	SDK                    int
-	// HardwareSerial is ro.serialno, the same over USB and Wi-Fi.
+	// HardwareSerial is ro.serialno (else ro.boot.serialno), the same
+	// over USB and Wi-Fi.
 	HardwareSerial string
+	// AndroidID is the phone's android_id, read only when the shell may
+	// read neither serial property (phoneID).
+	AndroidID string
 }
 
 // List implements driver.Provider. It reads each online device's
@@ -184,6 +191,7 @@ func (p *Provider) List(ctx context.Context) ([]driver.Info, error) {
 	}
 	p.link.kick(entries)
 	infos := make([]driver.Info, len(entries))
+	props := make([]*deviceProps, len(entries))
 	var wg sync.WaitGroup
 	for i, e := range entries {
 		infos[i] = infoFromEntry(e)
@@ -197,13 +205,23 @@ func (p *Provider) List(ctx context.Context) ([]driver.Info, error) {
 			defer cancel()
 			if pr, err := p.deviceProps(pctx, e); err == nil {
 				infos[i].Name, infos[i].Model, infos[i].OSVersion = pr.Name, pr.Model, pr.OSVersion
-				infos[i].ID = phoneID(e, pr)
+				props[i] = &pr
 			} else {
 				p.cfg.logf("android: read properties of %s: %v", e.Serial, err)
 			}
 		}()
 	}
 	wg.Wait()
+	// The ids, those of the connections that name the phone's serial
+	// first, so that the phone's connections at addresses take that
+	// serial in this listing already (phoneID).
+	for _, named := range []bool{true, false} {
+		for i, e := range entries {
+			if props[i] != nil && p.knowsSerial(e) == named {
+				infos[i].ID = p.phoneID(e, *props[i])
+			}
+		}
+	}
 	infos = mergeTransports(p.netInfos(infos))
 	return append(infos, p.driverlessPhones(infos)...), nil
 }
@@ -220,12 +238,79 @@ func (p *Provider) CheckHost() driver.HostCheck { return p.server.check(time.Now
 // phoneID is the id Pinky knows a phone by: the adb serial, except over
 // Wi-Fi, where it is the phone's hardware serial (the serial adb gives a
 // USB connection), so the phone keeps one id, and its PIN, settings and
-// history, whichever way it is connected.
+// history, whichever way it is connected. Without one, a connection that
+// Wireless debugging's discovery made has the serial in its name
+// ("adb-<serial>-<suffix>._adb-tls-connect._tcp"); one at an address
+// keeps the address.
 func phoneID(e adb.DeviceEntry, pr deviceProps) string {
-	if e.Wireless() && pr.HardwareSerial != "" {
+	if !e.Wireless() {
+		return e.Serial
+	}
+	if pr.HardwareSerial != "" {
 		return pr.HardwareSerial
 	}
+	if s := connectSerial(e.Serial); s != "" {
+		return s
+	}
 	return e.Serial
+}
+
+// connectSerial is the serial in the name of a connection that Wireless
+// debugging's discovery made, "" for any other.
+func connectSerial(serial string) string {
+	g, ok := strings.CutSuffix(serial, connectSuffix)
+	if !ok {
+		return ""
+	}
+	return guidSerial(g)
+}
+
+// namesSerial reports whether a connection's adb serial is, or names, the
+// phone's serial: a cable's, or one Wireless debugging's discovery made.
+func namesSerial(e adb.DeviceEntry) bool {
+	return !e.Wireless() || connectSerial(e.Serial) != ""
+}
+
+// knowsSerial reports whether a connection tells the phone's serial
+// without its shell: it names it (namesSerial), or the reconnector made it
+// for a paired phone, whose guid holds it.
+func (p *Provider) knowsSerial(e adb.DeviceEntry) bool {
+	return namesSerial(e) || (p.wifi != nil && p.wifi.guidAt(e.Serial) != "")
+}
+
+// phoneID is phoneID, also for a phone that hides its serial from the
+// shell, which then reads neither ro.serialno nor ro.boot.serialno: its
+// connections at addresses ("192.168.1.5:41235"; a new port each time
+// Wireless debugging restarts) take the serial in the guid of the paired
+// phone the reconnector connected there, else the serial that a
+// connection which names it (namesSerial) had with the same android_id,
+// else "android-<android_id>". Each would else be a phone of its own: a
+// Galaxy S10+ was listed some 40 times, all online.
+func (p *Provider) phoneID(e adb.DeviceEntry, pr deviceProps) string {
+	id := phoneID(e, pr)
+	if pr.HardwareSerial != "" || pr.AndroidID == "" {
+		return id
+	}
+	if p.wifi != nil && !namesSerial(e) {
+		// An address the reconnector connected for a paired phone: the
+		// phone's guid holds its serial.
+		if s := guidSerial(p.wifi.guidAt(e.Serial)); s != "" {
+			id = s
+		}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if id != e.Serial || !e.Wireless() {
+		if p.aidSerials == nil {
+			p.aidSerials = map[string]string{}
+		}
+		p.aidSerials[pr.AndroidID] = id
+		return id
+	}
+	if s := p.aidSerials[pr.AndroidID]; s != "" {
+		return s
+	}
+	return "android-" + pr.AndroidID
 }
 
 // mergeTransports lists a phone connected both ways once, by its USB
@@ -268,8 +353,7 @@ func (p *Provider) deviceProps(ctx context.Context, e adb.DeviceEntry) (devicePr
 	if ok {
 		return pr, nil
 	}
-	out, err := p.cfg.Client.Shell(ctx, e.Serial,
-		"getprop ro.product.model; getprop ro.build.version.release; getprop ro.build.version.sdk; settings get global device_name; getprop ro.serialno")
+	out, err := p.cfg.Client.Shell(ctx, e.Serial, propsCommand)
 	if err != nil {
 		return deviceProps{}, err
 	}
@@ -278,8 +362,22 @@ func (p *Provider) deviceProps(ctx context.Context, e adb.DeviceEntry) (devicePr
 		lines = append(lines, "")
 	}
 	pr = deviceProps{Model: strings.TrimSpace(lines[0]), OSVersion: strings.TrimSpace(lines[1])}
-	if hs := strings.TrimSpace(lines[4]); hs != "" && hs != "unknown" {
-		pr.HardwareSerial = hs
+	serial := func(s string) string {
+		if s = strings.TrimSpace(s); s == "unknown" {
+			return ""
+		}
+		return s
+	}
+	pr.HardwareSerial = serial(lines[4])
+	for _, l := range lines[5:] {
+		if v, ok := strings.CutPrefix(l, "pinky-boot="); ok && pr.HardwareSerial == "" {
+			pr.HardwareSerial = serial(v)
+		}
+		if v, ok := strings.CutPrefix(l, "pinky-aid="); ok {
+			if v = strings.TrimSpace(v); v != "" && v != "null" {
+				pr.AndroidID = v
+			}
+		}
 	}
 	fmt.Sscan(strings.TrimSpace(lines[2]), &pr.SDK)
 	pr.Name = strings.TrimSpace(lines[3])
@@ -294,6 +392,15 @@ func (p *Provider) deviceProps(ctx context.Context, e adb.DeviceEntry) (devicePr
 	p.mu.Unlock()
 	return pr, nil
 }
+
+// propsCommand reads what deviceProps keeps, one line each: the model, the
+// Android version, the SDK level, the name the person gave the phone and
+// ro.serialno; then ro.boot.serialno, and the android_id only when the
+// shell may read neither serial property (the settings command takes a
+// moment).
+const propsCommand = "getprop ro.product.model; getprop ro.build.version.release; getprop ro.build.version.sdk; " +
+	"settings get global device_name; getprop ro.serialno; echo pinky-boot=$(getprop ro.boot.serialno); " +
+	"[ -n \"$(getprop ro.serialno)$(getprop ro.boot.serialno)\" ] || echo pinky-aid=$(settings get secure android_id)"
 
 func infoFromEntry(e adb.DeviceEntry) driver.Info {
 	info := driver.Info{
@@ -369,7 +476,7 @@ func (p *Provider) OpenDevice(ctx context.Context, id string) (*Device, error) {
 			}
 			info.Name, info.Model, info.OSVersion = pr.Name, pr.Model, pr.OSVersion
 		}
-		if e.Serial != id && phoneID(e, pr) != id {
+		if e.Serial != id && p.phoneID(e, pr) != id {
 			continue
 		}
 		if best == nil || better(info, *best) {

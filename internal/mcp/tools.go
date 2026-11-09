@@ -288,7 +288,7 @@ func (s *Server) addTools(srv *sdk.Server, remote bool) {
 		})
 
 	sdk.AddTool(srv, &sdk.Tool{Name: "phone_apps", Title: "List apps",
-		Description: "List the installed apps you may use, optionally filtered. Blocked apps are not listed.",
+		Description: "List the installed apps you may use, optionally filtered. Blocked apps are not listed. An Android phone's app clones (dual apps, 应用分身) are listed as apps of their own, with ids like com.tencent.mm@999; open one by that id or its name.",
 		InputSchema: schema[appsIn](nil), Annotations: readOnly},
 		func(ctx context.Context, req *sdk.CallToolRequest, in appsIn) (*sdk.CallToolResult, any, error) {
 			return render(s.session(req, remote).Apps(ctx, gateway.AppsRequest{Call: gateway.Call{Device: strings.TrimSpace(in.Device)}, Query: in.Query})), nil, nil

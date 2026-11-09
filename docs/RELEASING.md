@@ -59,7 +59,7 @@ Every package carries Pinky's own adb, so that Android phones need no platform t
 
 | Package | Where | Built |
 | --- | --- | --- |
-| Pinky.app | `Contents/Helpers/adb`, signed with the app | on the Mac, with CMake (Apple's clang, macOS 12 and later), for each processor |
+| Pinky.app | `Contents/Helpers/adb`, signed with the app | on the Mac, with CMake (Apple's clang, for macOS 12 and later; see [platform.md](notes/platform.md)), for each processor |
 | Windows installer and zip | `adb.exe`, `AdbWinApi.dll`, `AdbWinUsbApi.dll` next to `Pinky.exe` | a 32-bit adb.exe, as Google's, with Ubuntu 24.04's mingw-w64 in Docker; the two DLLs are AOSP's own (`platform/development`, `host/windows/prebuilt/usb`), which AOSP builds for 32-bit Windows only |
 | Linux `.tar.gz` and `.deb` | `adb` next to `pinky`, executable | a static musl executable, in an Alpine container: no glibc needed |
 

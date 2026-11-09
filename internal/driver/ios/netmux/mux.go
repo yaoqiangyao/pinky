@@ -1,6 +1,8 @@
 // Package netmux is a usbmuxd of Pinky's own for iPhones and iPads over
-// Wi-Fi, for systems whose usbmuxd lists phones on a cable only (Linux:
-// libimobiledevice's usbmuxd has no network support).
+// Wi-Fi, for systems whose usbmuxd does not list them there by itself:
+// Linux, where libimobiledevice's usbmuxd has no network support, and
+// Windows, where Apple's lists a phone on Wi-Fi only while it is on a
+// cable too.
 //
 // A Mux serves the usbmuxd protocol on a socket of its own. It hands
 // everything about phones on a cable to the system's usbmuxd (the
@@ -24,6 +26,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,7 +50,8 @@ type Mux struct {
 	mu     sync.Mutex
 	phones map[string]netPhone // by UDID
 	nextID int
-	upDown bool // the upstream did not answer the last ListDevices
+	upDown bool            // the upstream did not answer the last ListDevices
+	upNet  map[string]bool // UDIDs the upstream listed on the network last
 
 	// DialTimeout bounds connecting to a phone on the network.
 	DialTimeout time.Duration
@@ -60,10 +64,17 @@ type Mux struct {
 	HeartbeatFn func(p Phone, id int) (heartbeatConn, error)
 
 	// PairDir is where the system's usbmuxd keeps pair records
-	// (LockdownDir). The Mux reads them there while that usbmuxd is not
+	// (LockdownDir). The Finder reads them there while that usbmuxd is not
 	// running: libimobiledevice's exits once no phone is on a cable
 	// (usbmuxd --systemd), and udev starts it again when one is plugged in.
 	PairDir string
+	// ServePairDir answers clients' ReadPairRecord from PairDir too while
+	// the system's usbmuxd is not running. Not on Windows (New), where the
+	// Mux listens on a loopback port any local user can reach and the pair
+	// records, the computer's private key among them, are readable by
+	// administrators only: a Pinky run as one would hand them out. Apple's
+	// usbmuxd keeps running there anyway.
+	ServePairDir bool
 }
 
 // netPhone is a listed phone, the DeviceID it was given, and what ends
@@ -86,7 +97,8 @@ func New(upstream string, log *slog.Logger) *Mux {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &Mux{upstream: upstream, log: log, phones: map[string]netPhone{}, nextID: firstNetworkID, DialTimeout: 5 * time.Second, PairDir: LockdownDir}
+	return &Mux{upstream: upstream, log: log, phones: map[string]netPhone{}, nextID: firstNetworkID, DialTimeout: 5 * time.Second,
+		PairDir: LockdownDir, ServePairDir: runtime.GOOS != "windows"}
 }
 
 // SetPhones sets the phones on the network. A phone keeps its DeviceID
@@ -297,7 +309,8 @@ func (m *Mux) serve(c net.Conn) {
 			return
 		case "ReadPairRecord":
 			// The upstream keeps the pair records, also of phones on the
-			// network; while it is not running they are read from PairDir.
+			// network; while it is not running they are read from PairDir
+			// (ServePairDir).
 			if _, _, err := relay(h, body); err != nil {
 				if up != nil {
 					up.Close()
@@ -351,6 +364,7 @@ func (m *Mux) listDevices(c net.Conn, h header, body []byte) error {
 		}
 	}
 	m.mu.Lock()
+	m.upNet = upNet
 	var phones []netPhone
 	for _, p := range m.phones {
 		if !upNet[p.UDID] {
@@ -381,6 +395,14 @@ func (m *Mux) listDevices(c net.Conn, h header, body []byte) error {
 	return writeMsg(c, rh, out)
 }
 
+// upstreamListsOnNetwork reports whether the upstream listed the phone on
+// the network itself, as of the last ListDevices.
+func (m *Mux) upstreamListsOnNetwork(udid string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.upNet[udid]
+}
+
 // upstreamList asks the upstream for its list.
 func (m *Mux) upstreamList(h header, body []byte, list any) (header, error) {
 	u, err := m.dialUpstream()
@@ -402,6 +424,9 @@ func (m *Mux) upstreamList(h header, body []byte, list any) (header, error) {
 // answerFromPairDir answers ReadPairRecord from the pair records in
 // PairDir, as the upstream would.
 func (m *Mux) answerFromPairDir(c net.Conn, tag uint32, req request) error {
+	if !m.ServePairDir {
+		return writePlist(c, tag, result{MessageType: "Result", Number: resultBadDevice})
+	}
 	data, err := m.pairFile(req.PairRecordID)
 	if err != nil {
 		return writePlist(c, tag, result{MessageType: "Result", Number: resultBadDevice})

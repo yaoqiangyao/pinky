@@ -159,7 +159,7 @@ func buildBundle(t *testing.T, app, version, sign string) {
 <key>CFBundleShortVersionString</key><string>` + version + `</string>
 <key>CFBundleVersion</key><string>` + version + `</string>
 <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-<key>LSMinimumSystemVersion</key><string>12.0</string>
+<key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>`

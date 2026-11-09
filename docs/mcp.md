@@ -194,7 +194,7 @@ Returns the whole current screen.
 | Argument | Type | Meaning |
 | --- | --- | --- |
 | `wait_ms` | 0–30000 | Wait until the screen differs from what the agent last saw (then let it settle), or until this passes |
-| `screenshot` | boolean | Add a JPEG screenshot, in the screen's pixel space. None while the phone is locked or a blocked app is in front |
+| `screenshot` | boolean | Add a JPEG screenshot at the phone's full resolution, in the screen's pixel space (1125×2436 on an iPhone X-sized screen). Some clients show the model a smaller copy of tool images: to keep or pass on the picture, save the image block of the result, not that preview. None while the phone is locked or a blocked app is in front |
 | `ocr` | boolean | Add all the text the pixels show that no element does, as `ocr` lines, however complete the list looks (Android adds such lines by itself only where the list is empty or sparse). On a computer without OCR, the result says so |
 
 Works while the person is in control and while an approval is open.

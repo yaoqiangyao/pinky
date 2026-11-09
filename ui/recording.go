@@ -67,6 +67,10 @@ func (a *app) recordingOf(taskID string) *gateway.RecordingView {
 	return nil
 }
 
+// recordingWide is the widest the recording player gets, for a phone
+// recorded in landscape.
+const recordingWide = 640
+
 // recPlayer plays a recording. Its fields are used on the main thread.
 type recPlayer struct {
 	a      *app
@@ -238,20 +242,28 @@ func (a *app) recordingView(c *mg.Context, t gateway.TaskView, pl *recPlayer) {
 		c.After(250 * time.Millisecond) // the time and the current step move on
 	}
 	mg.Row(c).Gap(20).AlignItems(mg.Start).Wrap().Children(func() {
-		h := float32(440)
+		kind := bezelAndroid
+		for _, d := range a.devices {
+			if d.Info.ID == t.DeviceID {
+				kind = bezelOf(d)
+			}
+		}
 		aspect := float32(9.0 / 19.5)
 		if pl.picW > 0 && pl.picH > 0 {
 			aspect = float32(pl.picW) / float32(pl.picH)
 		}
+		// 440 high for a portrait phone; a turned one takes at most
+		// recordingWide's width instead (bezel.go).
 		const bezel = 7
-		w := (h-2*bezel)*aspect + 2*bezel
-		mg.Box(c).Size(w, h).Shrink(0).Radius(34).Background(p.phone).Padding(bezel).Label(locales.RecordingPlayerLabel(t.Title)).
+		w, h, sw, sh := fitBezel(aspect, recordingWide, 440, bezel)
+		radius, inner := bezelRadius(kind, sw, sh, bezel)
+		mg.Box(c).Size(w, h).Shrink(0).Radius(radius).Background(p.phone).Padding(bezel).Label(locales.RecordingPlayerLabel(t.Title)).
 			Children(func() {
-				scr := mg.Box(c).Fill().Radius(28).Clip().Background(hex("#000000"))
+				scr := mg.Box(c).Fill().Radius(inner).Clip().Background(hex("#000000"))
 				scr.Draw(func(pt *mg.Painter, r mg.Rect) {
 					pl.take(pt)
 					if pl.bitmap != nil {
-						pt.Clip(r, 28, func() { drawTurned(pt, pl.bitmap, r, pl.turn) })
+						pt.Clip(r, inner, func() { drawTurned(pt, pl.bitmap, r, pl.turn) })
 					}
 					// What the step at this moment acted on, for a moment after
 					// its mark.
@@ -259,7 +271,7 @@ func (a *app) recordingView(c *mg.Context, t gateway.TaskView, pl *recPlayer) {
 						mk := pl.rec.Marks[i]
 						if pl.pos-mk.At < 2*time.Second && mk.Step >= 0 && mk.Step < len(t.Steps) {
 							if s := t.Steps[mk.Step]; !s.Target.Empty() {
-								pt.Clip(r, 28, func() {
+								pt.Clip(r, inner, func() {
 									drawOverlay(pt, r, p, s, stepDone, float32(pl.picW), float32(pl.picH), false)
 								})
 							}

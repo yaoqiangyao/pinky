@@ -40,7 +40,7 @@ Pinky 让任何 Agent（Claude Code、Claude Desktop、Codex、Cursor，或者�
 
 | | 需要 |
 | --- | --- |
-| **Mac** | macOS 12 或更高版本，Apple 芯片或 Intel 都行 |
+| **Mac** | macOS 13 或更高版本，Apple 芯片或 Intel 都行 |
 | **Windows** | Windows 10 或 11，64 位（x64） |
 | **Linux** | 64 位 PC（x86-64），Ubuntu 20.04、Debian 11 或更新的系统（glibc 2.29 或更高），以及 GTK 3 |
 | **Android 手机** | Android 10 到 17，一根 USB 线。Pinky 自带 adb；Windows 上个别手机要装 USB 驱动，Linux 上要开放 USB 访问权限（[见下文](#windows-和-linux-上的-usb)） |
@@ -120,7 +120,7 @@ Pinky 会自己准备好 iPhone，「添加手机 › iPhone」会一步步带�
 
 开发者磁盘映像随 [Xcode](https://apps.apple.com/app/xcode/id497799835)（Apple 给开发者的免费应用）提供，Pinky 不自带。在 Mac 上装一次 Xcode 并打开一次：Pinky 会用它装好的映像，之后 Xcode 不用再打开。iOS 27 及以上的 iPhone 需要 Xcode 27 或更新版本的映像：Apple 的签名服务器已不再为更早的映像签名，这时「添加手机」会写明 Pinky 用的是哪个映像，以及怎么换成新的。在 Windows 和 Linux 上，把这样一台 Mac 上的 `/Library/Developer/DeveloperDiskImages/iOS_DDI` 复制到 Pinky 的文件夹里（[放在哪](docs/notes/ios.md#preparing-a-phone-without-xcode)）。两样都没有，或者 Pinky 找到的映像（Xcode 的，或者复制到 Pinky 文件夹里的）被 Apple 拒签时，「添加手机」会提出从第三方镜像 github.com/doronz88/DeveloperDiskImage 下载映像（Xcode 27.0 beta 4，32 MB，由 pymobiledevice3 的作者维护，不是 Apple），只在你点「下载」时才下载；Pinky 会按预期的校验和核对每一个文件，之后就用它代替被 Apple 拒签的映像。iOS 27 及以上，iPhone 上不会装任何应用。
 
-在 iPhone 13 mini（iOS 27.0.1）上验证过：映像被卸掉后 Pinky 自己挂上 Xcode 的映像（约 1.5 秒），沿用手机上已有的映像，以及 iPhone 重启后映像还在。还没在真机上试过：下载的映像、开发者模式开关、iOS 27 以下的 iPhone，以及在 Windows 上连接 iPhone。在 Linux（Arch Linux）上，贡献者已经用 iOS 27.2 的 iPhone 和 iPad 跑通了有线和 Wi-Fi 连接，当时手机上已经有映像。
+在 iPhone 13 mini（iOS 27.0.1）上验证过：映像被卸掉后 Pinky 自己挂上 Xcode 的映像（约 1.5 秒），沿用手机上已有的映像，以及 iPhone 重启后映像还在。还没在真机上试过：下载的映像、开发者模式开关、iOS 27 以下的 iPhone，以及在 Windows 上配对 iPhone。贡献者已经在 Linux（Arch Linux）上用 iOS 27.2 的 iPhone 和 iPad、在 Windows 11 上用 iOS 27.2 的 iPhone 跑通了有线和 Wi-Fi 连接，当时手机上已经有映像。
 
 #### 通过 Wi-Fi 使用 iPhone 和 iPad
 
@@ -135,7 +135,7 @@ iPhone 或 iPad 和电脑在同一个 Wi-Fi 下，并且电脑在 Wi-Fi 上列�
 
 在 Mac 上，系统的设备服务 usbmuxd 在和 Wi-Fi 上的 iPhone 的连接断过一次之后（比如手机的 Wi-Fi 关了又开），可能会把它弄丢，最长约一小时都不再找它，「访达」里也看不到。Pinky 发现你用的手机明明在网络上却不再被列出时，会显示「Wi-Fi 上找不到」，并在它的页面上提供「重启设备服务…」：你确认后，macOS 会要求输入管理员密码，所有 iPhone 和 iPad（包括插着线的）都会断开一两秒。在「终端」里运行 `sudo killall usbmuxd` 效果相同。刚拔线的手机，Pinky 大约 10 秒内就会给出提示；其他情况下会等一分钟，因为熄屏后醒来的手机会自己回来。拔线后这台电脑在 Wi-Fi 上完全看不到的手机，会显示「Wi-Fi 上看不到」，并说明可能的原因：手机熄屏了、连的是另一个网络或者网络会把设备互相隔开（访客网络、一些路由器）、开着 VPN，或者 Pinky 没有「本地网络」权限。
 
-在 Linux 上，系统的设备服务（`usbmuxd` 软件包）只列出插着线的 iPhone 和 iPad，所以 Pinky 会自己在 Wi-Fi 上找：它在网络上找到和这台电脑配对过的手机，直接连过去。除了 `usbmuxd`，不用另外安装或设置什么。如果你运行了一个自己就能列出 Wi-Fi 上手机的设备服务（比如 netmuxd），并带上指向它的 `USBMUXD_SOCKET_ADDRESS` 启动 Pinky，Pinky 就用它。
+在 Linux 和 Windows 上，系统的设备服务不会自己列出 Wi-Fi 上的 iPhone 和 iPad：Linux 上（`usbmuxd` 软件包）只列出插着线的，Windows 上（Apple Devices 或 iTunes）只在手机同时插着线时才列出。所以在这两个系统上，Pinky 通过 Wi-Fi 使用手机时，会在系统的设备服务前面运行一个自己的小设备服务：它在网络上找到和这台电脑配对过的手机，直接连过去，插线手机的事都交给系统的设备服务。这时 Pinky 和 iPhone、iPad 之间的所有连接都经过它，插着线的也一样。除了系统自带的（Linux 上是 `usbmuxd`，Windows 上是 Apple Devices），不用另外安装或设置什么。如果你运行了一个自己就能列出 Wi-Fi 上手机的设备服务（比如 netmuxd），并带上指向它的 `USBMUXD_SOCKET_ADDRESS`（`unix:///socket/路径` 或 `tcp://127.0.0.1:端口`）启动 Pinky，Pinky 就用它，不再运行自己的。
 
 Pinky 打开手机、或者在有线和 Wi-Fi 之间切换时，会显示「正在连接」或「正在切换到 Wi-Fi」，而不是离线。通过 Wi-Fi 时，Pinky 从实时画面识别文字，不再用截图（Wi-Fi 下截一张图约 5 秒）。没设锁屏密码的 iPhone 或 iPad 读不出“已锁定”，所以它休眠掉线后再出现时，Pinky 要等它连续在线 30 秒才连接。
 

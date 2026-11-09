@@ -34,7 +34,7 @@ var caskTemplate = template.Must(template.New("cask").Parse(`cask "pinky" do
   end
 
   auto_updates true
-  depends_on macos: :monterey
+  depends_on macos: :ventura
 
   app "Pinky.app"
   command_wrapper "pinkyctl",

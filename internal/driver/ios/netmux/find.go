@@ -249,9 +249,20 @@ func (s *findState) tick(ctx context.Context) {
 		addrs[id] = append(addrs[id], ipv4s(svc)...)
 	}
 	found := map[string]netip.Addr{}
+	// alt is where a phone kept at its last address though its records
+	// name only others (the cable's link) goes when lockdown there no
+	// longer answers: it stays only while that answers.
+	alt := map[string]netip.Addr{}
 	for id, list := range addrs {
-		if addr, ok := pickAddr(list, s.listed[id]); ok {
-			found[id] = addr
+		addr, ok := pickAddr(list, s.listed[id])
+		if !ok {
+			continue
+		}
+		found[id] = addr
+		if !slices.Contains(list, addr) {
+			if other, ok := pickAddr(list, netip.Addr{}); ok {
+				alt[id] = other
+			}
 		}
 	}
 	for id, addr := range s.listed {
@@ -271,9 +282,11 @@ func (s *findState) tick(ctx context.Context) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for id, addr := range found {
-		if ps, ok := s.probes[id]; ok && ps.addr == addr && now.Before(ps.next) {
-			answered[id] = ps.ok
-			continue
+		if _, kept := alt[id]; !kept {
+			if ps, ok := s.probes[id]; ok && ps.addr == addr && now.Before(ps.next) {
+				answered[id] = ps.ok
+				continue
+			}
 		}
 		probed[id] = true
 		wg.Add(1)
@@ -288,6 +301,15 @@ func (s *findState) tick(ctx context.Context) {
 	wg.Wait()
 	if ctx.Err() != nil {
 		return
+	}
+	for id, other := range alt {
+		if answered[id] {
+			continue
+		}
+		if probe(ctx, other) {
+			s.log.Debug("netmux: lockdown no longer answers at the last address; moving", "device", id, "addr", other)
+			found[id], answered[id] = other, true
+		}
 	}
 	for id := range probed {
 		s.probes[id] = s.nextProbe(now, id, found[id], answered[id])

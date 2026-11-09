@@ -2,18 +2,37 @@
 
 What changed for people in each release of Pinky, newest first. A version is the release's date in Asia/Shanghai and that day's count: 2026.1107.2 is the second release of 7 November 2026. Notes wait under "Unreleased" until the next release takes them; see [docs/RELEASING.md](docs/RELEASING.md).
 
+## Unreleased
+
+- This release brings in all of DIYgod/pinky's updates from 2026.1109.8 to 2026.1109.13, described below; Android and macOS changes among them don't apply to flyfox's build. flyfox's own releases 2026.1109.8 to 2026.1109.10 had other notes under the same numbers: Windows names flyfox as Pinky's publisher, and iPhones keep working over Wi-Fi on Windows, now in the form upstream released.
+
+## 2026.1109.13 (2026-11-09)
+
+- An Android phone that hides its serial number from other apps is no longer listed once for each of its Wi-Fi connections, which could fill Phones and the menu bar with dozens of copies of the same phone. Pinky also no longer opens a second Wi-Fi connection to a phone that is already connected over Wi-Fi.
+
+## 2026.1109.12 (2026-11-09)
+
+- On Windows, an iPhone now keeps working over Wi-Fi when you unplug its cable, instead of going offline or staying "Locked on Wi-Fi" though it was unlocked. Thanks to yaoqiangyao.
+- On Windows, Pinky no longer leaves an adb console window open when the adb on your PATH comes from scoop.
+
+## 2026.1109.11 (2026-11-09)
+
+- An Android phone's picture no longer stays on "Connecting…" when its video encoder stops after a still screen: Pinky restarts the video within a few seconds. Thanks to NaNhkNaN.
+
 ## 2026.1109.10 (2026-11-09)
 
-- Windows now lists flyfox as Pinky's publisher, in Installed apps and in Pinky.exe's properties.
+- Agents can now find and open Android app clones (Dual apps, App Twin, Dual Messenger): each clone is listed as an app of its own, such as "WeChat (clone)", and opens on the phone's screen or in the background. A clone of a blocked app is blocked too.
+- Pinky needs macOS 13 or later, as it did in practice already: the app, its Homebrew cask and the README now say so, instead of macOS 12.
+- Choosing Use on an iPhone or iPad found on Wi-Fi no longer sometimes drops it for a moment and connects it a second time.
+- An agent waiting for your approval now gets your answer even when you answer at the very moment its call stops waiting, instead of having to repeat the call.
 
 ## 2026.1109.9 (2026-11-09)
 
-- On Windows, an iPhone now keeps working over Wi-Fi when you unplug its cable, instead of going offline or waiting as "Locked on Wi-Fi" though it was unlocked.
+- The phone Pinky draws around a mirror now turns with the screen: an iPad or iPhone in landscape, or an iPad in portrait, gets an outline of that shape on its page, in All phones and in recordings, with corners that stay the same turned.
 
 ## 2026.1109.8 (2026-11-09)
 
-- This release brings in all of DIYgod/pinky's updates from 2026.1109.1 to 2026.1109.7, described below. The notes of 2026.1109.1 and 2026.1109.2 are new to flyfox's build as well: its own releases with those numbers didn't have them.
-- Unlocking an iPhone on iOS 27.2 from the computer now reads whether its screen is on from the phone, instead of pressing Home when Pinky couldn't tell.
+- Android devices without an H.265 encoder, such as some TVs, now show a picture over Wi-Fi instead of "No picture: … read codec: EOF". Thanks to NaNhkNaN.
 
 ## 2026.1109.7 (2026-11-09)
 

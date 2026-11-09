@@ -75,6 +75,22 @@ sha256() {
 	fi
 }
 
+# gh_fetch downloads a file of a GitHub release through GitHub's API, with
+# gh (signed in, or GH_TOKEN), for when github.com's release downloads fail:
+# they answered 504 for hours on 9 November 2026 (Release v2026.1109.13).
+gh_fetch() {
+	case $1 in
+	https://github.com/*/*/releases/download/*/*) ;;
+	*) return 1 ;;
+	esac
+	command -v gh >/dev/null 2>&1 || return 1
+	path=${1#https://github.com/}
+	rest=${path#*/releases/download/}
+	echo "Downloading ${rest#*/} through GitHub's API"
+	gh release download "${rest%%/*}" --repo "${path%%/releases/download/*}" \
+		--pattern "${rest#*/}" --output "$2" --clobber
+}
+
 # fetch downloads a file, unless it is there with the right SHA-256. As in
 # scripts/ffmpeg.sh, sources are downloaded here, before any container,
 # which mounts the folder that holds them. aosp=1 decodes gitiles' base64.
@@ -85,7 +101,7 @@ fetch() {
 	fi
 	echo "Downloading $url"
 	tries=0
-	until curl -fsSL --retry 3 -o "$file.part" "$url"; do
+	until curl -fsSL --retry 3 -o "$file.part" "$url" || gh_fetch "$url" "$file.part"; do
 		tries=$((tries + 1))
 		if [ $tries -ge 5 ]; then
 			echo "adb.sh: could not download $url" >&2

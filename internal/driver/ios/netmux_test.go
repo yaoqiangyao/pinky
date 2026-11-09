@@ -1,7 +1,7 @@
 //go:build !windows
 
-// Pinky runs its own usbmuxd on Linux only (netmux.go); these tests serve
-// it on a Unix socket in /tmp, which Windows does not have.
+// Pinky runs its own usbmuxd on Linux and Windows (netmux.go); these
+// tests serve it on a Unix socket in /tmp, which Windows does not have.
 
 package ios
 
@@ -30,6 +30,7 @@ func muxTestProvider(t *testing.T) *Provider {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Setenv(ownMuxVar, "") // restored after the test: the provider sets it
 	p := NewProvider()
 	p.WiFiMux = true
 	p.nmux.anyOS = true
@@ -92,6 +93,32 @@ func TestWiFiMuxLeavesAGivenUsbmuxd(t *testing.T) {
 	}
 }
 
+// TestWiFiMuxAfterAnUpdate: a Pinky started by one that ran its own
+// usbmuxd (the update helper's relaunch on Windows) inherits its address,
+// at a port or socket that is gone. It starts its own all the same, and
+// the processes it starts in turn forget its address.
+func TestWiFiMuxAfterAnUpdate(t *testing.T) {
+	gone := "tcp://127.0.0.1:1"
+	t.Setenv("USBMUXD_SOCKET_ADDRESS", gone)
+	p := muxTestProvider(t)
+	t.Setenv(ownMuxVar, gone)
+	forgetInheritedMux() // as at the start of the process
+	p.SetWiFi(true)
+	defer p.SetWiFi(false)
+	addr := os.Getenv("USBMUXD_SOCKET_ADDRESS")
+	if p.nmux.mux == nil || !strings.HasPrefix(addr, "unix://"+p.nmux.dir) {
+		t.Fatalf("no usbmuxd of its own: USBMUXD_SOCKET_ADDRESS = %q", addr)
+	}
+	if own := os.Getenv(ownMuxVar); own != addr {
+		t.Errorf("%s = %q, want %q", ownMuxVar, own, addr)
+	}
+	// A process it starts: the address is forgotten there.
+	forgetInheritedMux()
+	if v := os.Getenv("USBMUXD_SOCKET_ADDRESS"); v != "" {
+		t.Errorf("a child keeps USBMUXD_SOCKET_ADDRESS = %q", v)
+	}
+}
+
 func TestWiFiMuxOnlyForTheApp(t *testing.T) {
 	t.Setenv("USBMUXD_SOCKET_ADDRESS", "")
 	p := muxTestProvider(t)
@@ -113,5 +140,11 @@ func TestPairedUDIDsOnly(t *testing.T) {
 	p.Only = map[string]bool{"B": true}
 	if got := strings.Join(p.pairedUDIDs(), ","); got != "B" {
 		t.Errorf("UDIDs under Only = %q", got)
+	}
+	// A phone the person removed is not looked for on Wi-Fi.
+	p.Only = nil
+	p.Forget("B")
+	if got := strings.Join(p.pairedUDIDs(), ","); strings.Contains(got, "B") {
+		t.Errorf("UDIDs after Forget = %q", got)
 	}
 }

@@ -127,6 +127,7 @@ func (r *reconnector) reconnect(ctx context.Context, entries []adb.DeviceEntry) 
 	// Phones the person removed from Pinky stay away until they add them
 	// back (Forget).
 	want = slices.DeleteFunc(want, func(g string) bool { return p.forgot(guidSerial(g)) })
+	want = slices.DeleteFunc(want, func(g string) bool { return r.onWiFi(ctx, g, entries) })
 	if len(want) == 0 {
 		return false, false
 	}
@@ -169,6 +170,41 @@ func (r *reconnector) reconnect(ctx context.Context, entries []adb.DeviceEntry) 
 		connected = true
 	}
 	return away, connected
+}
+
+// onWiFi reports whether a paired phone is connected on the computer's
+// network already in a way that missing does not see: at an address that
+// neither the server's discovery nor this driver connected, such as adb
+// tcpip's port 5555, another tool's connection, one that Pinky made before
+// it restarted, or the phone's other address (IPv6 rather than IPv4). One
+// more connection would be the same phone again. A cable's and Tailscale's
+// do not count: the server's discovery would connect the phone at home all
+// the same.
+func (r *reconnector) onWiFi(ctx context.Context, guid string, entries []adb.DeviceEntry) bool {
+	serial := guidSerial(guid)
+	if serial == "" {
+		return false
+	}
+	for _, e := range entries {
+		if e.State != adb.StateDevice || !e.Wireless() || viaTailnet(e.Serial) {
+			continue
+		}
+		pctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		pr, err := r.p.deviceProps(pctx, e)
+		cancel()
+		if err == nil && r.p.phoneID(e, pr) == serial {
+			return true
+		}
+	}
+	return false
+}
+
+// guidAt returns the guid of the paired phone this driver connected at an
+// address, "" for an address it did not connect.
+func (r *reconnector) guidAt(addr string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.byAddr[addr]
 }
 
 // holdBack reports whether a phone refused a connection at this address

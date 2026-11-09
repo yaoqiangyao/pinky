@@ -652,9 +652,13 @@ func (g *Gateway) resolveTaskApps(ctx context.Context, l *lease) []unknownApp {
 	var unknown []unknownApp
 	for _, w := range want {
 		if m := findApp(apps, w); m.ok {
-			out = appendUniq(out, m.app.ID)
-			if m.app.Name != "" {
-				out = appendUniq(out, m.app.Name)
+			// An app clone counts by the package it shares with the
+			// app it copies, since the screen reads them alike.
+			for _, a := range []driver.App{m.app, m.app.Original()} {
+				out = appendUniq(out, a.ID)
+				if a.Name != "" {
+					out = appendUniq(out, a.Name)
+				}
 			}
 		} else {
 			unknown = append(unknown, unknownApp{name: w, similar: m.similar})
@@ -1250,7 +1254,8 @@ func (s *Session) Apps(ctx context.Context, req AppsRequest) *Result {
 	q := strings.ToLower(strings.TrimSpace(req.Query))
 	var out []driver.App
 	for _, a := range apps {
-		app := screen.App{ID: a.ID, Name: a.Name}
+		orig := a.Original() // a clone is judged as the app it copies
+		app := screen.App{ID: orig.ID, Name: orig.Name}
 		if _, blocked := g.policy.Blocked(app); blocked {
 			continue
 		}

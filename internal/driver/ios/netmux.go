@@ -31,6 +31,31 @@ import (
 // When USBMUXD_SOCKET_ADDRESS is set already (netmuxd, usbmuxd2 or
 // another usbmuxd the person runs), Pinky uses that one and leaves the
 // network to it.
+//
+// The variable is set for the whole process, so every process Pinky starts
+// inherits it: the update helper and the Pinky it starts after an update,
+// a restart, an agent and what the agent runs. A Pinky that inherits the
+// address of another Pinky's usbmuxd, gone with it, must not take it for
+// one the person set, or no iPhone connects (Windows after an update). So
+// Pinky sets ownMuxVar to the same address, and a Pinky that starts with
+// both equal forgets them (forgetInheritedMux), before go-ios reads the
+// address.
+
+// ownMuxVar holds the address Pinky set USBMUXD_SOCKET_ADDRESS to for its
+// own usbmuxd.
+const ownMuxVar = "PINKY_OWN_USBMUXD"
+
+func init() { forgetInheritedMux() }
+
+// forgetInheritedMux unsets USBMUXD_SOCKET_ADDRESS when it is the address
+// another Pinky set for its own usbmuxd, and ownMuxVar always.
+func forgetInheritedMux() {
+	own := os.Getenv(ownMuxVar)
+	if own != "" && os.Getenv("USBMUXD_SOCKET_ADDRESS") == own {
+		os.Unsetenv("USBMUXD_SOCKET_ADDRESS")
+	}
+	os.Unsetenv(ownMuxVar)
+}
 
 // muxState is the provider's usbmuxd of its own. Its zero value is ready.
 type muxState struct {
@@ -135,10 +160,11 @@ func (p *Provider) serveMuxLocked(upstream string, l net.Listener, addr string) 
 	m.mux = netmux.New(upstream, p.logger())
 	go m.mux.Serve(l)
 	os.Setenv("USBMUXD_SOCKET_ADDRESS", addr)
+	os.Setenv(ownMuxVar, addr) // so that the processes it starts forget it
 	// Phones on the network close developer services without it
 	// (netmux/heartbeat.go). Not in tests, which list made-up phones.
 	m.mux.Heartbeat = m.dir == ""
-	p.logger().Info("iphone: looking for iPhones and iPads on Wi-Fi itself; this computer's usbmuxd lists phones on a cable only", "usbmuxd", upstream)
+	p.logger().Info("iphone: looking for iPhones and iPads on Wi-Fi itself; this computer's usbmuxd does not list them there by itself", "usbmuxd", upstream)
 }
 
 // ownMuxOS reports whether Pinky looks for phones on Wi-Fi itself on this
@@ -150,8 +176,8 @@ func ownMuxOS() bool {
 }
 
 // pairedUDIDs returns the phones this computer paired with: those with a
-// pair record where libimobiledevice's usbmuxd keeps them, and those Pinky
-// has seen. Under Only, only those phones.
+// pair record where the system's usbmuxd keeps them, and those Pinky has
+// seen, but not those the person removed. Under Only, only those phones.
 func (p *Provider) pairedUDIDs() []string {
 	ids := map[string]bool{}
 	for _, id := range netmux.PairedUDIDs(netmux.LockdownDir) {
@@ -163,6 +189,11 @@ func (p *Provider) pairedUDIDs() []string {
 	}
 	for id := range p.wifi.use {
 		ids[id] = true
+	}
+	// A phone the person removed is not looked for, nor asked, until it is
+	// on a cable again (Forget).
+	for id := range p.wifi.forgot {
+		delete(ids, id)
 	}
 	p.mu.Unlock()
 	var out []string

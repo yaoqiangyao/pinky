@@ -210,10 +210,26 @@ func (s *Session) startError(what string, err error) error {
 	case <-time.After(300 * time.Millisecond):
 	}
 	if logs := s.logs.recent(); len(logs) > 0 {
-		return fmt.Errorf("scrcpy: %s: %w; server log: %s", what, err, strings.Join(logs, " | "))
+		err = fmt.Errorf("scrcpy: %s: %w; server log: %s", what, err, strings.Join(logs, " | "))
+	} else {
+		err = fmt.Errorf("scrcpy: %s: %w", what, err)
 	}
-	return fmt.Errorf("scrcpy: %s: %w", what, err)
+	if why := s.VideoFailure(); why != "" {
+		return &EncoderError{Reason: why, Err: err}
+	}
+	return err
 }
+
+// EncoderError is a start that failed because the server's video encoder
+// did, before the server sent the stream's header: a phone with no encoder
+// for the codec asked for (a TV without H.265) fails at "read codec".
+type EncoderError struct {
+	Reason string // the server's log line that says so
+	Err    error
+}
+
+func (e *EncoderError) Error() string { return e.Err.Error() }
+func (e *EncoderError) Unwrap() error { return e.Err }
 
 // readLogs collects the server's output lines until the process ends.
 func (s *Session) readLogs() {

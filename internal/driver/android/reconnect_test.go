@@ -84,6 +84,57 @@ func TestReconnectServerBlind(t *testing.T) {
 	}
 }
 
+// TestReconnectPhoneOnWiFiAlready: a paired phone that is connected on the
+// computer's network at an address the reconnector does not know (adb
+// tcpip's port, another tool's, a Pinky that ran before, its IPv6 address)
+// gets no other connection; on a cable or through Tailscale only, it gets
+// one, as the server's discovery would give it.
+func TestReconnectPhoneOnWiFiAlready(t *testing.T) {
+	const props = "Pixel 9\n17\n37\nPixel\nR5CN20ABC\n"
+	for _, tc := range []struct {
+		name, serial, extra string
+		connects            bool
+	}{
+		{"adb tcpip's port", "192.168.1.42:5555", "", false},
+		{"its IPv6 address", "[2408:8207:1234::5]:41000", "", false},
+		{"a cable", "R5CN20ABC", "usb:1-1 ", true},
+		{"Tailscale", "100.101.102.103:5555", "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, p := newReconnectFake(t)
+			f.set(func(f *fakeADB) {
+				f.known = []string{guidPixel}
+				f.own = []string{guidPixel + "\t_adb-tls-connect._tcp\t192.168.1.42:41000"}
+				f.devices = []string{tc.serial + "\tdevice " + tc.extra + "product:x model:Pixel_9 device:x transport_id:3"}
+				f.props = map[string]string{tc.serial: props}
+			})
+			p.wifi.reconnect(context.Background(), entries(t, p))
+			if _, connects := f.counts(); (len(connects) == 1) != tc.connects || len(connects) > 1 {
+				t.Errorf("connects %q, want a connection: %v", connects, tc.connects)
+			}
+		})
+	}
+}
+
+// TestReconnectHiddenSerial: a connection the reconnector made for a
+// paired phone whose shell reads no serial is listed under the serial in
+// the phone's guid.
+func TestReconnectHiddenSerial(t *testing.T) {
+	f, p := newReconnectFake(t)
+	f.set(func(f *fakeADB) {
+		f.known = []string{guidPixel}
+		f.own = []string{guidPixel + "\t_adb-tls-connect._tcp\t192.168.1.42:41000"}
+		f.props = map[string]string{"192.168.1.42:41000": "Pixel 9\n17\n37\nPixel\n\npinky-boot=\npinky-aid=9774d56d682e549c\n"}
+	})
+	if _, connected := p.wifi.reconnect(context.Background(), entries(t, p)); !connected {
+		t.Fatal("not connected")
+	}
+	infos, err := p.List(context.Background())
+	if err != nil || len(infos) != 1 || infos[0].ID != "R5CN20ABC" {
+		t.Fatalf("listed %+v %v, want the phone as R5CN20ABC", infos, err)
+	}
+}
+
 // TestReconnectLeavesItToTheServer: phones the server's discovery lists, or
 // that it connected itself, are its own; the driver neither searches nor
 // connects.

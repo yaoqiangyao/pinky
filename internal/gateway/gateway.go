@@ -101,6 +101,10 @@ type Gateway struct {
 	agents      map[string]*agentState
 	apSteps     map[string]stepRef // approval id -> the step it holds
 
+	// listMu makes discovery passes take turns at listing the phones and
+	// applying what they listed (discover). It is taken before mu.
+	listMu sync.Mutex
+
 	subMu sync.Mutex
 	subs  map[chan Event]struct{}
 
@@ -295,6 +299,16 @@ func (g *Gateway) Refresh(ctx context.Context) { g.discover(ctx) }
 
 func (g *Gateway) discover(ctx context.Context) {
 	var wg sync.WaitGroup
+	// Passes start at any time (the loop, discoverSoon, pairings, a change
+	// of connection) and take turns, so that one whose listing is older
+	// never applies it over a newer one's. A pass that listed a phone found
+	// on Wi-Fi just before the person chose Use would else apply that
+	// after the next pass had opened the phone, take it offline ("Found on
+	// Wi-Fi"), and leave the pass after to open it again; so would a pass
+	// that listed a phone on its cable just before it moved to Wi-Fi. The
+	// opens run outside the turn: a pass waits for another's listing, not
+	// for its opens.
+	g.listMu.Lock()
 	for _, p := range g.opt.Providers {
 		infos, err := p.List(ctx)
 		if err != nil {
@@ -353,6 +367,7 @@ func (g *Gateway) discover(ctx context.Context) {
 			g.emit(Event{Kind: EventDevices, DeviceID: id})
 		}
 	}
+	g.listMu.Unlock()
 	wg.Wait()
 }
 

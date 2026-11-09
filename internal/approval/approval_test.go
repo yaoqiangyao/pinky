@@ -156,3 +156,22 @@ func TestOpenAfterClose(t *testing.T) {
 		t.Fatalf("wait after close: %v", err)
 	}
 }
+
+// TestWaitDecidedAsTimeRunsOut: a decision there when the wait's time runs
+// out is handed over, not reported as still open, which would cost the
+// agent a repeated call.
+func TestWaitDecidedAsTimeRunsOut(t *testing.T) {
+	c := New(Options{Timeout: time.Minute})
+	defer c.Close()
+	for i := range 500 {
+		a := c.Open(Request{Kind: KindAction, Binding: bind})
+		if err := c.Decide(a.ID, AllowOnce, ""); err != nil {
+			t.Fatal(err)
+		}
+		// The decision and the wait's end are both there when it looks.
+		out, err := c.Wait(context.Background(), a.ID, time.Nanosecond)
+		if err != nil || out.State != Used {
+			t.Fatalf("try %d: %+v, %v", i, out, err)
+		}
+	}
+}

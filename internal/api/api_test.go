@@ -232,8 +232,55 @@ func TestTrustedControl(t *testing.T) {
 	if err := ctl.Call("decide", DecideParams{Need: needs[0].ID, Decision: gateway.AllowOnce, Note: "done"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if res := <-done; res.Status != gateway.StatusSettled || res.Note != "done" {
+	// The call blocks MaxBlock at most (50 ms here), then says
+	// approval_pending, and the agent repeats it with the approval_id: a
+	// slow computer answers the person's decision to the repeat (once on
+	// Windows CI).
+	res := <-done
+	if res.Status == gateway.StatusPending {
+		res = s.Handoff(context.Background(), gateway.HandoffRequest{Call: gateway.Call{ApprovalID: res.ApprovalID}, Reason: "Please sign in"})
+	}
+	if res.Status != gateway.StatusSettled || res.Note != "done" {
 		t.Fatalf("handoff: %+v", res)
+	}
+}
+
+// TestTrustedControlLateDecision: the person hands control back after the
+// agent's call stopped waiting. The agent's next call, with the approval_id
+// or without, gets the answer, and the person is not asked again.
+func TestTrustedControlLateDecision(t *testing.T) {
+	d := shortDirs(t)
+	g, _ := startServer(t, d, true)
+	ctl, err := DialControl(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ctl.Close()
+	s := g.OpenSession(gateway.AgentInfo{Name: "Claude Code"})
+	defer s.Close()
+	s.Connect(context.Background(), gateway.ConnectRequest{Task: "Help"})
+	for _, withID := range []bool{true, false} {
+		res := s.Handoff(context.Background(), gateway.HandoffRequest{Reason: "Please sign in"})
+		if res.Status != gateway.StatusPending || res.ApprovalID == "" {
+			t.Fatalf("first call: %+v", res)
+		}
+		var needs []NeedInfo
+		if err := ctl.Call("needs", nil, &needs); err != nil || len(needs) != 1 {
+			t.Fatalf("needs %+v, %v", needs, err)
+		}
+		if err := ctl.Call("decide", DecideParams{Need: needs[0].ID, Decision: gateway.AllowOnce, Note: "done"}, nil); err != nil {
+			t.Fatal(err)
+		}
+		again := gateway.HandoffRequest{Reason: "Please sign in"}
+		if withID {
+			again.ApprovalID = res.ApprovalID
+		}
+		if res := s.Handoff(context.Background(), again); res.Status != gateway.StatusSettled || res.Note != "done" {
+			t.Fatalf("repeat (approval_id %v): %+v", withID, res)
+		}
+		if err := ctl.Call("needs", nil, &needs); err != nil || len(needs) != 0 {
+			t.Fatalf("asked again: %+v, %v", needs, err)
+		}
 	}
 }
 

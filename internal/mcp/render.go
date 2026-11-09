@@ -117,6 +117,9 @@ func writeResult(b *strings.Builder, res *gateway.Result, indent string) {
 			if a.System {
 				l += " · system"
 			}
+			if a.CloneOf != nil {
+				l += " · clone of " + a.CloneOf.Name
+			}
 			line(l)
 		}
 	}

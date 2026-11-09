@@ -439,8 +439,12 @@ func TestOnePhoneOverUSBAndWiFi(t *testing.T) {
 	if got := phoneID(wifi, pr); got != "3e8be48e" {
 		t.Errorf("Wi-Fi id %q, want the hardware serial", got)
 	}
-	if got := phoneID(wifi, deviceProps{}); got != wifi.Serial {
-		t.Errorf("Wi-Fi id without a hardware serial %q", got)
+	if got := phoneID(wifi, deviceProps{}); got != "3e8be48e" {
+		t.Errorf("Wi-Fi id without a hardware serial %q, want the serial in the name", got)
+	}
+	addr := adb.DeviceEntry{Serial: "192.168.1.5:41235", State: adb.StateDevice}
+	if got := phoneID(addr, deviceProps{}); got != addr.Serial {
+		t.Errorf("an address's id without a hardware serial %q", got)
 	}
 	emu := adb.DeviceEntry{Serial: "emulator-5560", State: adb.StateDevice}
 	if got := phoneID(emu, deviceProps{HardwareSerial: "EMULATOR36X1X11X0"}); got != "emulator-5560" {
@@ -461,5 +465,96 @@ func TestOnePhoneOverUSBAndWiFi(t *testing.T) {
 	})
 	if len(out) != 1 || out[0].Connection != "wifi" {
 		t.Errorf("USB not usable, Wi-Fi online: %+v", out)
+	}
+}
+
+// TestPhoneHidingItsSerial: a phone whose shell reads neither ro.serialno
+// nor ro.boot.serialno, with several Wi-Fi connections at addresses (a new
+// port each time Wireless debugging restarts), is listed once: under the
+// serial that a connection naming it has with the same android_id, else
+// under its android_id. Each connection was a phone of its own before: a
+// Galaxy S10+ was listed some 40 times, all online.
+func TestPhoneHidingItsSerial(t *testing.T) {
+	const hidden = "SM-G975F\n12\n31\nGalaxy S10+\n\npinky-boot=\npinky-aid=9774d56d682e549c\n"
+	addrs := []string{"192.168.1.5:37001", "192.168.1.5:41235", "192.168.1.5:43567"}
+	line := func(serial, extra string) string {
+		return serial + "\tdevice " + extra + "product:beyond2 model:SM_G975F device:beyond2 transport_id:1"
+	}
+	for _, tc := range []struct {
+		name   string
+		named  []string // connections that name the serial: a cable's, or the discovery's
+		props  string
+		wantID string
+	}{
+		{"addresses only", nil, hidden, "android-9774d56d682e549c"},
+		{"with the discovery's connection", []string{"adb-R58M30ABCDE-kIY2HE._adb-tls-connect._tcp"}, hidden, "R58M30ABCDE"},
+		{"with a cable", []string{"R58M30ABCDE usb:1-1 "}, hidden, "R58M30ABCDE"},
+		{"ro.boot.serialno only", nil, "SM-G975F\n12\n31\nGalaxy S10+\n\npinky-boot=R58M30ABCDE\n", "R58M30ABCDE"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, p := newFakeADB(t)
+			f.set(func(f *fakeADB) {
+				f.props = map[string]string{}
+				for _, n := range tc.named {
+					serial, extra, _ := strings.Cut(n, " ")
+					f.devices = append(f.devices, line(serial, extra))
+					f.props[serial] = tc.props
+				}
+				for _, a := range addrs {
+					f.devices = append(f.devices, line(a, ""))
+					f.props[a] = tc.props
+				}
+			})
+			infos, err := p.List(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(infos) != 1 || infos[0].ID != tc.wantID || infos[0].Name != "Galaxy S10+" || infos[0].State != driver.StateOnline {
+				t.Fatalf("listed %+v, want one online Galaxy S10+ with id %s", infos, tc.wantID)
+			}
+		})
+	}
+	// Once seen with a connection that names it, the phone keeps that
+	// serial at its addresses alone too.
+	f, p := newFakeADB(t)
+	f.set(func(f *fakeADB) {
+		f.props = map[string]string{"adb-R58M30ABCDE-kIY2HE._adb-tls-connect._tcp": hidden, addrs[0]: hidden}
+		f.devices = []string{line("adb-R58M30ABCDE-kIY2HE._adb-tls-connect._tcp", ""), line(addrs[0], "")}
+	})
+	if _, err := p.List(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.set(func(f *fakeADB) { f.devices = f.devices[1:] })
+	if infos, err := p.List(context.Background()); err != nil || len(infos) != 1 || infos[0].ID != "R58M30ABCDE" {
+		t.Fatalf("at its address alone: %+v %v", infos, err)
+	}
+}
+
+func TestResetWait(t *testing.T) {
+	l := &live{cfg: &Config{}, video: true, sized: make(chan struct{}), done: make(chan struct{})}
+	t0 := time.Now()
+	if w := l.resetWait(t0); w != 0 {
+		t.Fatalf("no reset sent: waited %v", w)
+	}
+	if !l.askReset(t0) {
+		t.Fatal("the first reset was not sent")
+	}
+	// A second ask waits for the first one's answer instead of going out.
+	if l.askReset(t0.Add(time.Second)) {
+		t.Error("a second reset went out while the first waited")
+	}
+	if w := l.resetWait(t0.Add(3 * time.Second)); w != 3*time.Second {
+		t.Errorf("waited %v, want the 3s since the first ask", w)
+	}
+	// The session header answers it (run clears resetAt).
+	l.resetAt = time.Time{}
+	if w := l.resetWait(t0.Add(time.Hour)); w != 0 {
+		t.Errorf("answered: waited %v", w)
+	}
+	if !l.askReset(t0.Add(4 * time.Second)) {
+		t.Fatal("a reset after the answer was not sent")
+	}
+	if w := l.resetWait(t0.Add(4*time.Second + resetStall)); w < resetStall {
+		t.Errorf("unanswered: waited %v, want at least %v", w, resetStall)
 	}
 }

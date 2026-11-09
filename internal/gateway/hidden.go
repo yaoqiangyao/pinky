@@ -502,6 +502,7 @@ func (g *Gateway) appIndex(ctx context.Context, hs *hideState, dev driver.Device
 			return true
 		}
 		for _, a := range byName[strings.ToLower(n)] {
+			a = a.Original() // a clone's icon is hidden with its original's
 			if _, b := g.policy.Blocked(screen.App{ID: a.ID, Name: a.Name}); b {
 				return true
 			}

@@ -371,7 +371,7 @@ func (p *Provider) infoFor(ctx context.Context, serial string) (driver.Info, err
 				continue
 			}
 			if pr, err := p.deviceProps(ctx, e); err == nil {
-				id = phoneID(e, pr) // read once per connection: List did
+				id = p.phoneID(e, pr) // read once per connection: List did
 			}
 		}
 	}

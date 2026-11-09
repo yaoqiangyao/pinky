@@ -507,3 +507,38 @@ func TestBlockAndUnblockApps(t *testing.T) {
 		t.Fatalf("unblock an app a rule names: %v", err)
 	}
 }
+
+// GitHub issue #18: an Android app clone's id ("com.tencent.mm@999",
+// driver.CloneID) is judged by its package, as the app it copies.
+func TestAppCloneIDs(t *testing.T) {
+	e := Default()
+	clone := screen.App{ID: chase.ID + "@999"}
+	if rule, ok := e.Blocked(clone); !ok || rule != "Finance apps" {
+		t.Fatalf("a bank's clone not blocked: %q %v", rule, ok)
+	}
+	if _, ok := e.Blocked(screen.App{ID: "com.hsbc.hsbcnet@128"}); !ok {
+		t.Fatal("a clone's id did not match a prefix entry")
+	}
+	if _, ok := e.Blocked(screen.App{ID: dinely.ID + "@999"}); ok {
+		t.Fatal("Dinely's clone blocked")
+	}
+	v := e.Evaluate(Input{Op: OpLaunch, Launch: screen.App{ID: whatsapp.ID + "@999"}, TaskApps: []string{whatsapp.ID}})
+	if v.Decision != Allow {
+		t.Fatalf("a clone of an app in the task's list: %+v", v)
+	}
+	v = e.Evaluate(Input{Op: OpType, App: whatsapp, Text: "x", TaskApps: []string{whatsapp.ID + "@999"}, Target: &screen.Element{Role: screen.RoleInput, Label: "Message"}})
+	if v.Decision != Allow {
+		t.Fatalf("the screen of a clone in the task's list: %+v", v)
+	}
+	for id, want := range map[string]string{
+		"com.tencent.mm@999": "com.tencent.mm",
+		"com.tencent.mm":     "com.tencent.mm",
+		"com.tencent.mm@":    "com.tencent.mm@",
+		"a@b.c":              "a@b.c",
+		"":                   "",
+	} {
+		if got := clonePackage(id); got != want {
+			t.Errorf("clonePackage(%q) = %q; want %q", id, got, want)
+		}
+	}
+}

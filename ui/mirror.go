@@ -197,16 +197,14 @@ func (m *mirror) close() {
 	}
 }
 
-// aspect is the screen's width over its height, from the stream once it
-// plays, else a phone's usual 9:20.
+// aspect is the screen's width over its height the right way up, from the
+// stream once it plays (landscape when the phone is turned), else the
+// phone's usual portrait (bezel.go).
 func (m *mirror) aspect(d gateway.DeviceView) float32 {
 	if m.picW > 0 && m.picH > 0 {
 		return float32(m.picW) / float32(m.picH)
 	}
-	if d.Info.Platform == driver.IOS {
-		return 1206.0 / 2622
-	}
-	return 9.0 / 20
+	return bezelOf(d).defaultAspect()
 }
 
 // lastPicture copies the picture the mirror shows, for a screenshot: the

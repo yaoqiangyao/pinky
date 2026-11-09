@@ -12,6 +12,8 @@
 # - copies the adb that scripts/adb.sh built into ADB (make adb), when set,
 #   to Contents/Helpers/adb, where Pinky looks for its own adb, with its
 #   license and build notes in Contents/Resources;
+# - checks that the executable needs the macOS that Info.plist names
+#   (LSMinimumSystemVersion), and the libraries and adb no newer one;
 # - signs the libraries, adb and the app again with SIGN, the identity
 #   mygo build signed with ("-", ad hoc, by default; a Developer ID gets
 #   the hardened runtime and a timestamp, as mygo build gives it);
@@ -110,6 +112,33 @@ if [ -n "${ADB:-}" ]; then
 	# shellcheck disable=SC2086 # signflags splits on purpose
 	codesign --force $signflags --sign "$sign" "$helpers/adb"
 fi
+
+# macOS runs no binary on a system older than the minos of its
+# LC_BUILD_VERSION, whatever Info.plist says. The Go linker sets the
+# executable's (13.0 in Go 1.27), so LSMinimumSystemVersion
+# (macos.minimumSystemVersion in cmd/pinky/mygo.json) must name the same
+# version, and no library or helper may need a newer one.
+# scripts/release's TestMacOSMinimum checks the toolchain the same way.
+minos() {
+	otool -l "$1" | awk '$1 == "cmd" { b = ($2 == "LC_BUILD_VERSION") } b && $1 == "minos" { print $2; exit }'
+}
+vnum() {
+	echo "$1" | awk -F. '{ printf "%d", $1 * 10000 + $2 * 100 + $3 }'
+}
+min=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$contents/Info.plist")
+exe=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$contents/Info.plist")
+v=$(minos "$contents/MacOS/$exe")
+if [ -z "$v" ] || [ "$(vnum "$v")" != "$(vnum "$min")" ]; then
+	echo "macapp: $exe needs macOS ${v:-?}, but Info.plist says $min (macos.minimumSystemVersion in cmd/pinky/mygo.json)" >&2
+	exit 1
+fi
+for f in "$frameworks"/*.dylib ${ADB:+"$helpers/adb"}; do
+	v=$(minos "$f")
+	if [ -z "$v" ] || [ "$(vnum "$v")" -gt "$(vnum "$min")" ]; then
+		echo "macapp: $(basename "$f") needs macOS ${v:-?}, newer than the app's $min" >&2
+		exit 1
+	fi
+done
 
 # shellcheck disable=SC2086 # signflags splits on purpose
 codesign --force $signflags --sign "$sign" "$frameworks"/*.dylib

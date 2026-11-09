@@ -60,7 +60,7 @@ func (l *live) attach(ctx context.Context) (*stream, error) {
 	if old != nil {
 		old.end(errors.New("android: replaced by a new stream"))
 	}
-	if err := l.send(scrcpy.ResetVideo()); err != nil {
+	if err := l.resetVideo(); err != nil {
 		l.detach(st)
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (st *stream) push(p scrcpy.Packet) {
 		if !p.Config {
 			if time.Since(st.resetAt) > 2*time.Second {
 				st.resetAt = time.Now()
-				go st.l.s.Send(scrcpy.ResetVideo())
+				go st.l.resetVideo()
 			}
 			return
 		}
@@ -127,7 +127,7 @@ func (st *stream) RequestKeyFrame() {
 	}
 	st.resetAt = time.Now()
 	st.mu.Unlock()
-	go st.l.s.Send(scrcpy.ResetVideo())
+	go st.l.resetVideo()
 }
 
 // end closes the stream with an error, from the session side.

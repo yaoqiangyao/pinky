@@ -76,8 +76,9 @@ func newIOSProvider(log *slog.Logger) (driver.Provider, error) {
 	// Under PINKY_DEVICES the provider does not even look at the other
 	// phones, over a cable or Wi-Fi: other tools use them.
 	p.Only = onlyDevices()
-	// On Linux, Pinky finds iPhones on Wi-Fi itself: the system's usbmuxd
-	// lists phones on a cable only.
+	// On Linux and Windows, Pinky finds iPhones on Wi-Fi itself: the
+	// system's usbmuxd lists them there not at all, or only while they are
+	// on a cable too.
 	p.WiFiMux = true
 	if dirs, err := api.DefaultDirs(); err == nil {
 		// Where Pinky looks for Apple's developer disk image before Xcode's.

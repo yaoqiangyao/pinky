@@ -355,7 +355,13 @@ func (c *Center) Wait(ctx context.Context, id string, max time.Duration) (Outcom
 	select {
 	case <-done:
 	case <-timeout:
-		return Outcome{State: Open}, nil
+		// A decision that came as the time ran out is handed over all the
+		// same: select picks either when both are there.
+		select {
+		case <-done:
+		default:
+			return Outcome{State: Open}, nil
+		}
 	case <-ctx.Done():
 		return Outcome{State: Open}, ctx.Err()
 	}

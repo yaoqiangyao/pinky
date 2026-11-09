@@ -300,7 +300,7 @@ func (p *Provider) conns(ctx context.Context, entries []adb.DeviceEntry, id stri
 			continue
 		}
 		pr, err := p.deviceProps(ctx, e)
-		if err != nil || (e.Serial != id && phoneID(e, pr) != id) {
+		if err != nil || (e.Serial != id && p.phoneID(e, pr) != id) {
 			continue
 		}
 		switch {

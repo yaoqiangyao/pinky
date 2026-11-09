@@ -33,10 +33,11 @@ type Provider struct {
 	// (an iOS_DDI folder in it), looked in before Xcode's; "" for none.
 	DiskImageDir string
 
-	// WiFiMux lets the provider run a usbmuxd of its own on Linux, whose
-	// usbmuxd lists phones on a cable only, to find phones on Wi-Fi
-	// (netmux.go). Only the app's provider sets it: it points go-ios, for
-	// the whole process, at that usbmuxd.
+	// WiFiMux lets the provider run a usbmuxd of its own on Linux and
+	// Windows, whose usbmuxd lists phones on Wi-Fi not at all or only while
+	// they are on a cable too, to find phones on Wi-Fi (netmux.go). Only the
+	// app's provider sets it: it points go-ios, for the whole process, at
+	// that usbmuxd, which then carries every connection to an iPhone.
 	WiFiMux bool
 
 	// Log gets a line for each step Pinky takes to prepare a phone:

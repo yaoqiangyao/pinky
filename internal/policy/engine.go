@@ -325,12 +325,13 @@ func (r Rule) matches(app screen.App, cats []string, kinds []Kind, in Input) boo
 
 // appIn reports whether the app matches any entry, by id or by name.
 func appIn(app screen.App, list []string) bool {
+	id := clonePackage(app.ID)
 	for _, x := range list {
-		x = strings.TrimSpace(x)
+		x = clonePackage(strings.TrimSpace(x))
 		if x == "" {
 			continue
 		}
-		if app.ID != "" && (x == app.ID || (strings.HasSuffix(x, "*") && strings.HasPrefix(app.ID, strings.TrimSuffix(x, "*")))) {
+		if id != "" && (x == id || (strings.HasSuffix(x, "*") && strings.HasPrefix(id, strings.TrimSuffix(x, "*")))) {
 			return true
 		}
 		if app.Name != "" && strings.EqualFold(x, app.Name) {
@@ -415,4 +416,15 @@ func (e *Engine) NotificationBlocked(ev screen.Event, name func(id string) strin
 	}
 	_, blocked := e.Blocked(app)
 	return blocked
+}
+
+// clonePackage returns the package of an Android app clone's id
+// ("com.tencent.mm@999", driver.CloneID), and any other id as it is: the
+// rules judge a clone as the app it copies.
+func clonePackage(id string) string {
+	pkg, user, ok := strings.Cut(id, "@")
+	if !ok || pkg == "" || user == "" || strings.Trim(user, "0123456789") != "" {
+		return id
+	}
+	return pkg
 }
